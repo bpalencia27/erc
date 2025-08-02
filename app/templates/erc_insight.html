@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERC Insight - Plataforma de Análisis para Enfermedad Renal Crónica</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- PDF.js para leer PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    
+    <!-- Chart.js para gráficos de tendencia -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+    <!-- ApexCharts para visualizaciones avanzadas -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+    <!-- SweetAlert2 para alertas mejoradas -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --bg-panel: #ffffff;
+            --bg-panel-alt: #f1f5f9;
+            --primary: #2563eb;
+            --primary-light: #3b82f6;
+            --secondary: #0ea5e9;
+            --text-main: #1e293b;
+            --text-subtle: #475569;
+            --border-color: #e2e8f0;
+            --risk-low: #22c55e;
+            --risk-moderate: #f59e0b;
+            --risk-high: #ef4444;
+            --risk-very-high: #b91c1c;
+            --erc-color: #0ea5e9;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            min-height: 100vh;
+        }
+        @media (min-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 55% 45%;
+            }
+        }
+        .form-panel {
+            padding: 2rem 2.5rem;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .report-panel {
+            padding: 2rem 2.5rem;
+            background-color: var(--bg-panel-alt);
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .input-field {
+            width: 100%;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            transition: all 0.2s ease;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
+        .checkbox-card {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .checkbox-card:hover {
+            background-color: #f1f5f9;
+        }
+        .checkbox-card input:checked ~ .content {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .checkbox-card input:checked {
+            accent-color: var(--primary);
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-backdrop.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            max-width: 500px;
+            width: 90%;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-backdrop.visible .modal-content {
+            transform: scale(1);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #report-output h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; }
+        #report-output h2 { font-size: 1.2rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; color: var(--primary); }
+        #report-output p { margin-bottom: 0.5rem; }
+        #report-output ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+        #report-output strong { font-weight: 600; }
+        #report-output .alert-mace { background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 1rem; margin-top: 1.5rem; margin-bottom: 1.5rem; }
+        .file-drop-area {
+            border: 2px dashed var(--border-color);
+            transition: all 0.2s ease;
+        }
+        .file-drop-area.highlight {
+            border-color: var(--primary);
+            background-color: #eff6ff;
+        }
+        .frailty-slider {
+            background: linear-gradient(to right, var(--risk-low), var(--risk-moderate), var(--risk-high));
+        }
+        .quick-med-btn {
+            background-color: #eef2ff;
+            color: var(--primary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .quick-med-btn:hover {
+            background-color: #e0e7ff;
+            transform: translateY(-1px);
+        }
+        .goal-chart-container {
+            height: 80px;
+            margin-top: 8px;
+        }
+        .patient-history-item {
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .patient-history-item:hover {
+            background-color: #f8fafc;
+            border-left-color: var(--primary-light);
+        }
+        .patient-history-item.active {
+            background-color: #eef2ff;
+            border-left-color: var(--primary);
+        }
+        /* Mejoras de accesibilidad */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+        .high-contrast {
+            --primary: #0047AB;
+            --primary-light: #1D63DC;
+            --text-main: #000000;
+            --text-subtle: #333333;
+            --risk-high: #CC0000;
+            --risk-very-high: #8B0000;
+        }
+        
+        /* Nuevos estilos UI/UX mejorados */
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+        .tab {
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            color: var(--text-subtle);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .tab:hover {
+            color: var(--primary);
+        }
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Nuevos componentes UI */
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-primary {
+            background-color: #dbeafe;
+            color: var(--primary);
+        }
+        .badge-secondary {
+            background-color: #e0f2fe;
+            color: var(--secondary);
+        }
+        .badge-success {
+            background-color: #dcfce7;
+            color: var(--risk-low);
+        }
+        .badge-warning {
+            background-color: #fef3c7;
+            color: var(--risk-moderate);
+        }
+        .badge-danger {
+            background-color: #fee2e2;
+            color: var(--risk-high);
+        }
+        
+        /* Animaciones */
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+        
+        /* Spinner circular */
+        .circular-progress {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+        }
+        .circular-progress canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .progress-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        /* Nuevas tarjetas */
+        .insight-card {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            transition: all 0.3s ease;
+        }
+        .insight-card:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        /* Mejoras a las tablas */
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .custom-table th {
+            background-color: #f8fafc;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .custom-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .custom-table tr:hover {
+            background-color: #f1f5f9;
+        }
+
+        /* Botón flotante de ayuda */
+        .floating-help-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 3.5rem;
+            height: 3.5rem;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            z-index: 40;
+            transition: all 0.3s ease;
+        }
+        .floating-help-btn:hover {
+            background-color: var(--primary-light);
+            transform: scale(1.1);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Animación de carga */
+        .dots-loader {
+            display: inline-block;
+            position: relative;
+            width: 80px;
+            height: 20px;
+        }
+        .dots-loader div {
+            position: absolute;
+            top: 8px;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: var(--primary);
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+        .dots-loader div:nth-child(1) {
+            left: 8px;
+            animation: dots1 0.6s infinite;
+        }
+        .dots-loader div:nth-child(2) {
+            left: 32px;
+            animation: dots2 0.6s infinite;
+        }
+        .dots-loader div:nth-child(3) {
+            left: 56px;
+            animation: dots2 0.6s infinite;
+        }
+        @keyframes dots1 {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+        @keyframes dots2 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(24px, 0); }
+        }
+        
+        /* Escala TFG */
+        .tfg-scale {
+            height: 8px;
+            width: 100%;
+            margin: 10px 0;
+            position: relative;
+            background: linear-gradient(to right, 
+                #b91c1c 0%, #b91c1c 15%, 
+                #ef4444 15%, #ef4444 30%, 
+                #f59e0b 30%, #f59e0b 45%, 
+                #facc15 45%, #facc15 60%, 
+                #84cc16 60%, #84cc16 90%, 
+                #22c55e 90%, #22c55e 100%
+            );
+            border-radius: 4px;
+        }
+        .tfg-marker {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: white;
+            border: 2px solid #1e293b;
+            border-radius: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            transition: left 0.5s ease;
+        }
+        
+        /* Nuevas animaciones */
+        .slide-in-bottom {
+            animation: slideInBottom 0.5s ease-out forwards;
+        }
+        @keyframes slideInBottom {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        /* Laboratorios Styles */
+        .lab-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+        .lab-card {
+            background-color: white;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+        .lab-card:hover {
+            border-color: var(--primary-light);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .lab-value-pill {
+            display: inline-flex;
+            align-items: center;
+            background-color: #f1f5f9;
+            border-radius: 9999px;
+            padding: 0.25rem 0.75rem;
+            font-weight: 600;
+        }
+        .lab-value-pill.normal {
+            background-color: #dcfce7;
+            color: var(--risk-low);
+        }
+        .lab-value-pill.alert {
+            background-color: #fee2e2;
+            color: var(--risk-high);
+        }
+        .lab-value-pill.warning {
+            background-color: #fef3c7;
+            color: var(--risk-moderate);
+        }
+
+        /* Animación de deslizamiento para tarjetas */
+        .card-slide-in {
+            animation: cardSlideIn 0.5s ease forwards;
+        }
+        @keyframes cardSlideIn {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Esferas de riesgo */
+        .risk-sphere {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.5s ease;
+        }
+        .risk-sphere::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+        @keyframes shine {
+            0% {
+                top: -100%;
+                left: -100%;
+            }
+            100% {
+                top: 100%;
+                left: 100%;
+            }
+        }
+        
+        /* Tooltips mejorados */
+        .enhanced-tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        .enhanced-tooltip .tooltip-content {
+            visibility: hidden;
+            background-color: #27272a;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            position: absolute;
+            z-index: 9999;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+        }
+        .enhanced-tooltip .tooltip-content::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -8px;
+            border-width: 8px;
+            border-style: solid;
+            border-color: #27272a transparent transparent transparent;
+        }
+        .enhanced-tooltip:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(-8px);
+        }
+    </style>
+</head>
+<body class="text-text-main">
+
+    <div class="main-grid">
+        <main class="form-panel">
+            <header class="mb-6 flex justify-between items-center">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <svg class="w-10 h-10 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
+                        </svg>
+                        <h1 class="text-3xl font-extrabold text-gray-900">ERC Insight</h1>
+                    </div>
+                    <p class="text-text-subtle">Plataforma de Análisis Clínico Inteligente para ERC</p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="high-contrast-toggle" class="text-gray-500 hover:text-primary p-2 rounded-full" title="Alternar contraste alto">
+                        <i class="fas fa-adjust"></i>
+                    </button>
+                    <button id="open-history-btn" class="text-gray-500 hover:text-primary p-2 rounded-full" title="Historial de pacientes">
+                        <i class="fas fa-history"></i>
+                    </button>
+                    <button id="sync-data-btn" class="text-gray-500 hover:text-primary p-2 rounded-full" title="Sincronizar con base de datos">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Tabs de navegación principal -->
+            <div class="tab-container mb-4">
+                <div class="tab active" data-tab="datos-basicos">Datos Básicos</div>
+                <div class="tab" data-tab="clinica">Clínica</div>
+                <div class="tab" data-tab="laboratorios">Laboratorios</div>
+                <div class="tab" data-tab="tratamiento">Tratamiento</div>
+            </div>
+
+            <form id="clinical-form" class="space-y-6 flex-grow overflow-y-auto pr-4 -mr-4">
+                <!-- Tab de Datos Básicos -->
+                <section id="tab-datos-basicos" class="tab-content active">
+                    <h2 class="text-xl font-bold mb-4 border-l-4 border-primary pl-3">Datos del Paciente</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                        <div>
+                            <label for="nombre" class="font-medium text-sm mb-1 block">Nombre Completo <span class="text-red-500">*</span></label>
+                            <input type="text" id="nombre" name="nombre" class="input-field" required>
+                        </div>
+                        <div>
+                            <label for="documento" class="font-medium text-sm mb-1 block">Documento <span class="text-red-500">*</span></label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <select id="tipo_documento" name="tipo_documento" class="input-field">
+                                    <option value="CC">CC</option>
+                                    <option value="CE">CE</option>
+                                    <option value="TI">TI</option>
+                                    <option value="PP">PP</option>
+                                </select>
+                                <input type="text" id="numero_documento" name="numero_documento" class="input-field col-span-2" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="edad" class="font-medium text-sm mb-1 block">Edad (años) <span class="text-red-500">*</span></label>
+                            <input type="number" id="edad" name="edad" class="input-field" min="1" required>
+                        </div>
+                        <div>
+                            <label for="sexo" class="font-medium text-sm mb-1 block">Sexo <span class="text-red-500">*</span></label>
+                            <select id="sexo" name="sexo" class="input-field" required>
+                                <option value="m">Masculino</option>
+                                <option value="f">Femenino</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="peso" class="font-medium text-sm mb-1 block">Peso (kg) <span class="text-red-500">*</span></label>
+                            <input type="number" id="peso" name="peso" step="0.1" class="input-field" required>
+                        </div>
+                         <div>
+                            <label for="talla" class="font-medium text-sm mb-1 block">Talla (cm)</label>
+                            <input type="number" id="talla" name="talla" class="input-field">
+                        </div>
+                        <div>
+                             <label for="imc" class="font-medium text-sm mb-1 block">Índice de Masa Corporal (IMC)</label>
+                             <input type="text" id="imc" name="imc" class="input-field bg-gray-100" readonly>
+                        </div>
+                        <div>
+                            <label for="per_abd" class="font-medium text-sm mb-1 block">Perímetro Abdominal (cm)</label>
+                            <input type="number" id="per_abd" name="per_abd" class="input-field">
+                        </div>
+                    </div>
+
+                    <h2 class="text-xl font-bold mt-8 mb-4 border-l-4 border-primary pl-3">Presión Arterial</h2>
+                    <div id="pa-container" class="space-y-2">
+                    </div>
+                    <button type="button" id="add-pa-btn" class="text-sm font-medium text-primary hover:text-primary-light mt-2" aria-label="Añadir medición de presión arterial"><i class="fas fa-plus mr-1"></i> Añadir medición</button>
+                </section>
+
+                <!-- Tab de Clínica -->
+                <section id="tab-clinica" class="tab-content">
+                    <h2 class="text-xl font-bold mb-4 border-l-4 border-primary pl-3">Diagnósticos y Condiciones</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="font-medium text-sm mb-2 block">Diagnósticos Principales <span class="text-red-500">*</span></label>
+                            <div id="main-diagnostics" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <label class="checkbox-card"><input type="checkbox" name="diagnostico" value="HTA" class="h-5 w-5 mr-4"><span class="content">Hipertensión (HTA)</span></label>
+                                <label class="checkbox-card"><input type="checkbox" name="diagnostico" value="DM" id="dm-checkbox" class="h-5 w-5 mr-4"><span class="content">Diabetes (DM)</span></label>
+                                <label class="checkbox-card"><input type="checkbox" name="diagnostico" value="ERC" id="erc-checkbox" class="h-5 w-5 mr-4"><div class="flex items-center content"><span>ERC</span><div id="erc-alert-icon" class="tooltip ml-2 hidden"><svg class="w-5 h-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg><span class="tooltip-text">ERC Estadio ≥3 o Albuminuria >30 mg/g.</span></div></div></label>
+                            </div>
+                        </div>
+                        <div id="duracion-dm-container" class="hidden">
+                             <label for="duracion_dm" class="font-medium text-sm mb-1 block">Duración DM (años)</label>
+                             <input type="number" id="duracion_dm" name="duracion_dm" class="input-field w-full md:w-1/2" min="0">
+                        </div>
+                        <div>
+                            <label class="font-medium text-sm mb-2 block">Condiciones Adicionales</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <label class="checkbox-card"><input type="checkbox" id="ecv_establecida" name="ecv_establecida" class="h-5 w-5 mr-4"><span class="content">Enf. Cardiovascular Establecida</span></label>
+                                <label class="checkbox-card"><input type="checkbox" id="tabaquismo" name="tabaquismo" class="h-5 w-5 mr-4"><span class="content">Tabaquismo Activo</span></label>
+                                <label class="checkbox-card"><input type="checkbox" id="cond_socioeconomicas" name="cond_socioeconomicas" class="h-5 w-5 mr-4"><div class="flex items-center content"><span>Cond. Socioeconómicas Adversas</span></div></label>
+                                <div class="flex items-center">
+                                    <label class="checkbox-card flex-grow"><input type="checkbox" id="fragil" name="fragil" class="h-5 w-5 mr-4" disabled><span class="content">Paciente Frágil</span></label>
+                                    <button type="button" id="eval-fragilidad-btn" class="ml-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-3 rounded-lg transition-colors" aria-label="Evaluar fragilidad">Evaluar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="predialysis-section" class="hidden mt-6">
+                        <h2 class="text-xl font-bold mb-4 border-l-4 border-yellow-500 pl-3 text-yellow-700">Programa de Prediálisis</h2>
+                        <div class="bg-yellow-50 p-4 rounded-lg">
+                            <p class="font-medium text-sm mb-2">La TFG del paciente es ≤ 20 ml/min. Indique el estado en el programa de prediálisis:</p>
+                            <div class="flex gap-4">
+                                <label class="flex items-center"><input type="radio" name="predialysis_status" value="primera_vez" class="h-4 w-4 mr-2"> Primera Vez</label>
+                                <label class="flex items-center"><input type="radio" name="predialysis_status" value="en_seguimiento" class="h-4 w-4 mr-2"> En Seguimiento</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="text-xl font-bold mt-8 mb-4 border-l-4 border-primary pl-3">Adherencia y Acceso</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                        <div>
+                            <label for="adherencia" class="font-medium text-sm mb-1 block">Adherencia al Tratamiento</label>
+                            <select id="adherencia" name="adherencia" class="input-field">
+                                <option value="buena">Buena</option>
+                                <option value="regular">Regular</option>
+                                <option value="mala">Mala</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center pt-6">
+                             <label class="checkbox-card flex-grow"><input type="checkbox" id="barreras_acceso" name="barreras_acceso" class="h-5 w-5 mr-4"><span class="content">Barreras de Acceso (EPS/Farmacia)</span></label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tab de Laboratorios -->
+                <section id="tab-laboratorios" class="tab-content">
+                    <h2 class="text-xl font-bold mb-4 border-l-4 border-primary pl-3">Laboratorios Esenciales</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mb-4">
+                        <div>
+                            <label for="creatinina" class="font-medium text-sm mb-1 block">Creatinina Sérica (mg/dL) <span class="text-red-500">*</span></label>
+                            <div class="flex gap-2">
+                                <input type="number" id="creatinina" name="creatinina" step="0.01" class="input-field" required>
+                                <input type="date" id="creatinina_date" name="creatinina_date" class="input-field">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-medium text-sm mb-1 block">TFG (Cockcroft-Gault)</label>
+                            <div class="relative">
+                                <input type="text" id="tfg-display" class="input-field bg-gray-100" readonly>
+                                <div class="tfg-scale mt-2">
+                                    <div id="tfg-marker" class="tfg-marker" style="left: 0%;"></div>
+                                </div>
+                                <div class="flex justify-between text-xs mt-1">
+                                    <span>&lt;15</span>
+                                    <span>15-29</span>
+                                    <span>30-44</span>
+                                    <span>45-59</span>
+                                    <span>60-89</span>
+                                    <span>&gt;90</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Selector de método de entrada -->
+                    <div class="flex items-center mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <p class="text-sm font-medium mr-4">Método de ingreso de laboratorios:</p>
+                        <div class="flex gap-4">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="lab-input-method" value="manual" checked class="h-4 w-4">
+                                <span class="ml-2 text-sm">Manual</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="lab-input-method" value="upload" class="h-4 w-4">
+                                <span class="ml-2 text-sm">Cargar Archivo</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="lab-input-method" value="api" class="h-4 w-4">
+                                <span class="ml-2 text-sm">Conectar con API</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor de entrada manual de laboratorios -->
+                    <div id="manual-labs-container" class="space-y-4">
+                        <div class="lab-grid">
+                            <!-- Los elementos lab-card se generarán dinámicamente con JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Contenedor de carga de archivos -->
+                    <div id="upload-labs-container" class="hidden">
+                        <div id="lab-upload-container" class="p-4 rounded-lg border border-dashed file-drop-area">
+                            <div class="text-center">
+                                <i class="fas fa-cloud-upload-alt text-3xl text-gray-400"></i>
+                                <p class="mt-2 text-sm text-gray-600">Arrastra y suelta archivos (.pdf, .txt)</p>
+                                <p class="text-xs text-gray-500 mt-1">o</p>
+                                <button type="button" onclick="document.getElementById('lab-file-upload').click()" class="mt-2 text-sm font-semibold text-primary hover:underline">Selecciona archivos</button>
+                                <input type="file" id="lab-file-upload" accept=".txt,.pdf" class="hidden" multiple/>
+                            </div>
+                        </div>
+                        <div id="file-loader" class="mt-2 hidden items-center gap-2 text-sm text-primary">
+                            <div class="dots-loader"><div></div><div></div><div></div></div>
+                            <span>Analizando archivos...</span>
+                        </div>
+                    </div>
+
+                    <!-- Contenedor de conexión API -->
+                    <div id="api-labs-container" class="hidden">
+                        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <div class="flex items-center mb-3">
+                                <i class="fas fa-link text-blue-500 mr-2"></i>
+                                <h3 class="font-semibold">Conexión con Sistemas Clínicos</h3>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-3">Ingrese las credenciales para conectarse al sistema de información clínico:</p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                <input type="text" placeholder="ID del servicio" class="input-field">
+                                <input type="password" placeholder="Token de acceso" class="input-field">
+                            </div>
+                            <button type="button" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                <i class="fas fa-sync-alt mr-2"></i> Conectar y Obtener Laboratorios
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="loaded-labs-container" class="mt-4 space-y-2">
+                        <!-- Los elementos de laboratorios cargados se añadirán aquí -->
+                    </div>
+
+                    <!-- Tabla de Vigencia de Laboratorios -->
+                    <div class="mt-8">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold text-md">Tabla de Vigencia de Laboratorios</h3>
+                            <span class="badge badge-primary">Referencia</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Laboratorio</th>
+                                        <th>Bajo Riesgo</th>
+                                        <th>Riesgo Moderado</th>
+                                        <th>Alto Riesgo</th>
+                                        <th>Muy Alto Riesgo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Creatinina</td>
+                                        <td>Anual</td>
+                                        <td>Semestral</td>
+                                        <td>Trimestral</td>
+                                        <td>Mensual/Bimestral</td>
+                                    </tr>
+                                    <tr>
+                                        <td>HbA1c</td>
+                                        <td>Semestral</td>
+                                        <td>Trimestral</td>
+                                        <td>Trimestral</td>
+                                        <td>Bimestral</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Perfil Lipídico</td>
+                                        <td>Anual</td>
+                                        <td>Semestral</td>
+                                        <td>Trimestral</td>
+                                        <td>Trimestral</td>
+                                    </tr>
+                                    <tr>
+                                        <td>RAC</td>
+                                        <td>Anual</td>
+                                        <td>Semestral</td>
+                                        <td>Trimestral</td>
+                                        <td>Trimestral</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Electrolitos</td>
+                                        <td>Anual</td>
+                                        <td>Semestral</td>
+                                        <td>Trimestral</td>
+                                        <td>Mensual</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tab de Tratamiento -->
+                <section id="tab-tratamiento" class="tab-content">
+                    <h2 class="text-xl font-bold mb-4 border-l-4 border-primary pl-3">Tratamiento Farmacológico</h2>
+                    <div id="medicamentos-container" class="space-y-2"></div>
+                    <button type="button" id="add-medicamento-btn" class="text-sm font-medium text-primary hover:text-primary-light mt-2" aria-label="Añadir medicamento"><i class="fas fa-plus mr-1"></i> Añadir medicamento</button>
+                    
+                    <div class="mt-6 bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-medium text-sm mb-3">Categorías de Medicamentos para ERC</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <button type="button" class="quick-category-btn p-2 bg-white border border-gray-200 rounded-md hover:bg-blue-50 transition-colors" data-category="nefroprotector">
+                                <i class="fas fa-shield-alt text-blue-500 mb-1"></i>
+                                <span class="block text-xs">Nefroprotectores</span>
+                            </button>
+                            <button type="button" class="quick-category-btn p-2 bg-white border border-gray-200 rounded-md hover:bg-blue-50 transition-colors" data-category="antihipertensivo">
+                                <i class="fas fa-heart text-red-500 mb-1"></i>
+                                <span class="block text-xs">Antihipertensivos</span>
+                            </button>
+                            <button type="button" class="quick-category-btn p-2 bg-white border border-gray-200 rounded-md hover:bg-blue-50 transition-colors" data-category="hipolipemiante">
+                                <i class="fas fa-tint-slash text-purple-500 mb-1"></i>
+                                <span class="block text-xs">Hipolipemiantes</span>
+                            </button>
+                            <button type="button" class="quick-category-btn p-2 bg-white border border-gray-200 rounded-md hover:bg-blue-50 transition-colors" data-category="antidiabetico">
+                                <i class="fas fa-syringe text-green-500 mb-1"></i>
+                                <span class="block text-xs">Antidiabéticos</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <p class="text-xs text-gray-500 mb-2">Añadir Fármacos Comunes:</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="quick-med-btn" data-med="Atorvastatina" data-dosis="40mg" data-freq="Cada noche">Atorvastatina 40mg</button>
+                            <button type="button" class="quick-med-btn" data-med="Losartán" data-dosis="50mg" data-freq="Cada 12h">Losartán 50mg</button>
+                            <button type="button" class="quick-med-btn" data-med="Metformina" data-dosis="850mg" data-freq="Cada 12h">Metformina 850mg</button>
+                            <button type="button" class="quick-med-btn" data-med="AAS" data-dosis="100mg" data-freq="Cada 24h">AAS 100mg</button>
+                            <button type="button" class="quick-med-btn" data-med="Empagliflozina" data-dosis="10mg" data-freq="Cada 24h">Empagliflozina 10mg</button>
+                            <button type="button" class="quick-med-btn" data-med="Furosemida" data-dosis="40mg" data-freq="Cada mañana">Furosemida 40mg</button>
+                        </div>
+                    </div>
+                    
+                    <div id="medication-recommendations" class="mt-8 p-4 bg-green-50 rounded-lg border border-green-200 hidden">
+                        <div class="flex items-center mb-3">
+                            <i class="fas fa-lightbulb text-amber-500 mr-2"></i>
+                            <h3 class="font-semibold">Recomendaciones de Tratamiento</h3>
+                        </div>
+                        <div id="medication-recommendations-content" class="text-sm space-y-2">
+                            <!-- Recomendaciones generadas dinámicamente -->
+                        </div>
+                    </div>
+                </section>
+            </form>
+            
+            <div class="mt-auto pt-4 border-t border-gray-200">
+                <button id="generate-report-btn" type="submit" form="clinical-form" class="w-full bg-primary hover:bg-primary-light text-white font-bold py-4 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center gap-3">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    Generar Informe Clínico con IA
+                </button>
+            </div>
+        </main>
+
+        <aside class="report-panel">
+            <div id="risk-assessment-panel" class="p-5 rounded-xl mb-4 transition-all duration-500 bg-gray-200">
+                <h3 class="font-bold text-lg text-center text-gray-600 mb-3">Clasificación de Riesgo del Paciente</h3>
+                <div class="risk-sphere bg-gray-400" id="risk-level-indicator">
+                    <span>INCOMPLETO</span>
+                </div>
+                <div id="risk-factors-summary" class="mt-4 text-sm text-gray-600 space-y-1"><p>Complete los datos para calcular el riesgo.</p></div>
+            </div>
+            
+            <div id="kdigo-classification" class="p-5 rounded-xl mb-4 bg-white shadow-sm">
+                <h3 class="font-bold text-lg text-center text-gray-600 mb-3">Clasificación KDIGO</h3>
+                <div class="relative w-full overflow-hidden rounded-lg">
+                    <img src="https://kdigo.org/wp-content/uploads/2018/03/KDIGO_CKD_Color-1.png" alt="Clasificación KDIGO" class="w-full h-auto opacity-30">
+                    <div id="kdigo-marker" class="absolute w-10 h-10 border-4 border-primary rounded-full transition-all duration-500" style="top: 40%; left: 40%; opacity: 0;"></div>
+                </div>
+            </div>
+            
+            <div id="goals-preview-panel" class="p-5 rounded-xl mb-6 transition-all duration-500 bg-white shadow-sm">
+                <h3 class="font-bold text-lg text-center text-gray-600 mb-4">Metas Terapéuticas Clave</h3>
+                <div id="goals-preview-content" class="space-y-3">
+                   <p class="text-center text-sm text-gray-400">Los datos de metas aparecerán aquí.</p>
+                </div>
+                
+                <div class="mt-4">
+                    <h4 class="font-medium text-sm mb-2">Progreso del Tratamiento</h4>
+                    <div class="circular-progress">
+                        <canvas id="goals-progress-chart" width="120" height="120"></canvas>
+                        <div class="progress-value">0%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="report-container" class="h-full">
+                <div id="report-placeholder" class="text-center text-gray-500 pt-10">
+                    <img src="https://api.dicebear.com/7.x/bottts/svg?seed=ercinsight&backgroundColor=0ea5e9" alt="ERC Insight Logo" class="w-24 h-24 mx-auto mb-4">
+                    <h2 class="text-xl font-medium">Esperando datos del paciente</h2>
+                    <p class="max-w-xs mx-auto">El informe generado por la IA aparecerá aquí.</p>
+                </div>
+                <div id="report-loader" class="text-center text-gray-500 pt-16 hidden">
+                    <div class="dots-loader mx-auto"><div></div><div></div><div></div></div>
+                    <p class="mt-4">Analizando datos y generando informe...</p>
+                </div>
+                <div id="report-output-container" class="hidden h-full flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-2xl font-bold">Informe Clínico</h2>
+                        <div>
+                            <button id="print-report-btn" class="text-gray-500 hover:text-primary px-2 py-1 rounded-md" aria-label="Imprimir informe"><i class="fas fa-print"></i></button>
+                            <button id="copy-report-btn" class="text-gray-500 hover:text-primary px-2 py-1 rounded-md" aria-label="Copiar informe"><i class="fas fa-copy"></i></button>
+                            <button id="save-report-btn" class="text-gray-500 hover:text-primary px-2 py-1 rounded-md" aria-label="Guardar informe"><i class="fas fa-save"></i></button>
+                            <button id="email-report-btn" class="text-gray-500 hover:text-primary px-2 py-1 rounded-md" aria-label="Enviar por email"><i class="fas fa-envelope"></i></button>
+                        </div>
+                    </div>
+                    <div id="report-output" class="flex-grow bg-white p-6 rounded-xl shadow-sm overflow-y-auto"></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div id="fragility-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-2">Criterios de Fragilidad de Fried</h3>
+            <p class="text-sm text-text-subtle mb-4">Marque los criterios que cumple el paciente. Se considera frágil con 3 o más.</p>
+            <div id="fried-criteria" class="space-y-3">
+                <label class="flex items-center"><input type="checkbox" value="perdida_peso" class="h-5 w-5 mr-3"> Pérdida de peso no intencionada (>5kg o >5% en el último año).</label>
+                <label class="flex items-center"><input type="checkbox" value="agotamiento" class="h-5 w-5 mr-3"> Sensación de agotamiento auto-referida.</label>
+                <label class="flex items-center"><input type="checkbox" value="actividad_fisica" class="h-5 w-5 mr-3"> Bajo nivel de actividad física.</label>
+                <label class="flex items-center"><input type="checkbox" value="lentitud" class="h-5 w-5 mr-3"> Lentitud de la marcha.</label>
+                <label class="flex items-center"><input type="checkbox" value="debilidad" class="h-5 w-5 mr-3"> Debilidad muscular (fuerza de prensión).</label>
+            </div>
+            <div class="mt-6">
+                <p class="text-sm font-medium text-gray-700">Estado: <span id="frailty-status" class="font-bold">No Frágil</span></p>
+                <div class="relative mt-2 h-2 rounded-full frailty-slider">
+                    <div id="frailty-marker" class="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-primary shadow-md transition-all duration-300" style="left: 0%;"></div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3"><button id="close-fragility-modal" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cerrar</button></div>
+        </div>
+    </div>
+    
+    <div id="alert-modal" class="modal-backdrop">
+        <div class="modal-content text-center">
+            <div id="alert-icon-container" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100"><svg class="h-6 w-6 text-red-600" stroke="currentColor" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg></div>
+            <h3 id="alert-title" class="text-lg leading-6 font-medium text-gray-900 mt-4">Título del Error</h3>
+            <div class="mt-2 px-7 py-3"><p id="alert-message" class="text-sm text-gray-500">Mensaje de error detallado.</p></div>
+            <div class="mt-5"><button i
