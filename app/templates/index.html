@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron">
+    <h1 class="display-4">ERC Insight</h1>
+    <p class="lead">Plataforma de análisis clínico inteligente para Enfermedad Renal Crónica</p>
+    <hr class="my-4">
+    <p>Optimice el seguimiento de pacientes con ERC mediante análisis automático de laboratorios y generación de informes con IA.</p>
+    <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+        <a href="{{ url_for('patient.new') }}" class="btn btn-primary btn-lg me-md-2">Nuevo Paciente</a>
+        <a href="{{ url_for('upload.upload_form') }}" class="btn btn-success btn-lg">Cargar Documento</a>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Análisis TFG</h5>
+                <p class="card-text">Cálculo automático de TFG y clasificación de etapas de ERC según KDIGO.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Extracción de Datos</h5>
+                <p class="card-text">Extracción inteligente de resultados de laboratorio desde PDF y TXT.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Informes con IA</h5>
+                <p class="card-text">Generación de informes médicos detallados con inteligencia artificial.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
