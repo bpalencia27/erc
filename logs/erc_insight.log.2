@@ -1,0 +1,100 @@
+2025-08-03 12:43:00,875 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
+Traceback (most recent call last):
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 2190, in wsgi_app
+    response = self.full_dispatch_request()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1486, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask_cors\extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1484, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1469, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\main\routes.py", line 8, in index
+    return render_template('index.html', title='ERC Insight - Análisis Clínico Inteligente')
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\templating.py", line 151, in render_template
+    return _render(app, template, context)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\templating.py", line 132, in _render
+    rv = template.render(context)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\jinja2\environment.py", line 1301, in render
+    self.environment.handle_exception()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\jinja2\environment.py", line 936, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\index.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 26, in top-level template code
+    <a class="nav-link" href="{{ url_for('uploader.upload_form') }}">Cargar Documento</a>
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1697, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1686, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\werkzeug\routing\map.py", line 950, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'uploader.upload_form'. Did you mean 'patient.calculate_tfg' instead?
+2025-08-03 12:43:01,491 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
+Traceback (most recent call last):
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 2190, in wsgi_app
+    response = self.full_dispatch_request()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1486, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask_cors\extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1484, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1469, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\main\routes.py", line 8, in index
+    return render_template('index.html', title='ERC Insight - Análisis Clínico Inteligente')
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\templating.py", line 151, in render_template
+    return _render(app, template, context)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\templating.py", line 132, in _render
+    rv = template.render(context)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\jinja2\environment.py", line 1301, in render
+    self.environment.handle_exception()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\jinja2\environment.py", line 936, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\index.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 26, in top-level template code
+    <a class="nav-link" href="{{ url_for('uploader.upload_form') }}">Cargar Documento</a>
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1697, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1686, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\werkzeug\routing\map.py", line 950, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'uploader.upload_form'. Did you mean 'patient.calculate_tfg' instead?
+2025-08-03 12:45:31,412 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\__init__.py:71]
+2025-08-03 12:45:36,636 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
+Traceback (most recent call last):
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 2190, in wsgi_app
+    response = self.full_dispatch_request()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1486, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask_cors\extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1484, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1469, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\main\routes.py", line 8, in index
+    return render_template('index.html', title='ERC Insight - Análisis Clínico Inteligente')
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\templating.py", line 151, in render_template
+    return _render(app, template, context)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\templating.py", line 132, in _render
+    rv = template.render(context)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\jinja2\environment.py", line 1301, in render
+    self.environment.handle_exception()
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\jinja2\environment.py", line 936, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\index.html", line 1, in top-level template code
+    {% extends "base.html" %}
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 26, in top-level template code
+    <a class="nav-link" href="{{ url_for('uploader.upload_form') }}">Cargar Documento</a>
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1697, in url_for
+    return self.handle_url_build_error(error, endpoint, values)
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1686, in url_for
+    rv = url_adapter.build(  # type: ignore[union-attr]
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\werkzeug\routing\map.py", line 950, in build
+    raise BuildError(endpoint, values, method, self)
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'uploader.upload_form'. Did you mean 'patient.calculate_tfg' instead?

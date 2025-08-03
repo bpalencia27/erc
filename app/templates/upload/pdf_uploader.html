@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Integración del uploader con tu ecosistema y diseño moderno -->
+<div class="container mx-auto py-8">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <h2 class="text-2xl font-bold mb-6 text-primary">Cargar Documento de Laboratorio</h2>
+        <form method="POST" action="{{ url_for('uploader.process_document') }}" enctype="multipart/form-data" class="space-y-6">
+            <div>
+                <label for="file" class="block text-sm font-medium text-gray-700 mb-2">Selecciona archivo (.pdf, .txt)</label>
+                <input type="file" name="file" id="file" accept=".pdf,.txt" class="input-field" required>
+            </div>
+            <button type="submit" class="w-full bg-primary hover:bg-primary-light text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center gap-3">
+                <i class="fas fa-cloud-upload-alt"></i>
+                Subir y Analizar
+            </button>
+        </form>
+        <div class="mt-6 text-sm text-gray-500">
+            Solo se permiten archivos PDF o TXT. El sistema extraerá automáticamente los datos relevantes.
+        </div>
+    </div>
+</div>
+{% endblock %}

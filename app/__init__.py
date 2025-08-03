@@ -30,15 +30,15 @@ def create_app(config_class='config.ProductionConfig'):
     # Registrar blueprints
     from app.main import bp as main_bp
     app.register_blueprint(main_bp)
-    
+
+    from app.upload import bp as uploader_bp
+    app.register_blueprint(uploader_bp, url_prefix='/upload')
+
     from app.patient import bp as patient_bp
     app.register_blueprint(patient_bp, url_prefix='/patient')
-    
+
     from app.report import bp as report_bp
     app.register_blueprint(report_bp, url_prefix='/report')
-    
-    from app.upload import bp as upload_bp
-    app.register_blueprint(upload_bp, url_prefix='/upload')
     
     # Crear directorios necesarios
     create_directories(app)

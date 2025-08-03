@@ -8,7 +8,7 @@ from app.parsers.pdf_extractor import extract_data_from_pdf
 from app.parsers.txt_extractor import extract_data_from_txt
 from app.parsers.lab_parser import parse_lab_results
 
-bp = Blueprint('upload', __name__)
+bp = Blueprint('uploader', __name__)
 
 ALLOWED_EXTENSIONS = {'pdf', 'txt'}
 
