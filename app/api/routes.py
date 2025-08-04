@@ -133,3 +133,12 @@ def process_patient():
 @bp.route('/test')
 def test():
     return {"message": "API funcionando correctamente"}
+
+@bp.route('/health')
+def health_check():
+    """Endpoint para verificar el estado de la aplicación.
+    Utilizado por Render.com para health checks."""
+    return jsonify({
+        "status": "ok",
+        "message": "ERC Insight API está funcionando correctamente"
+    })

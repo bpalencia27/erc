@@ -35,12 +35,16 @@ Si el script reporta algún problema, soluciónalo antes de continuar.
 2. Conecta tu repositorio de GitHub (deberás autorizar a Render para acceder a tus repositorios)
 3. Configura los siguientes parámetros:
    - **Name**: erc-insight (o el nombre que prefieras)
-   - **Environment**: Python
+   - **Environment**: Python 3
    - **Region**: Selecciona la más cercana a tus usuarios
    - **Branch**: main (o la rama principal de tu repositorio)
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn wsgi:app --log-file -`
-   - **Plan**: Free
+   - **Start Command**: `gunicorn wsgi:app`
+   - **Instance Type**: Free
+   - **Health Check Path**: `/api/health`
+4. En la sección "Advanced":
+   - **Pre-Deploy Command**: `python -c "from app import create_app; from app.extensions import db; app = create_app('production'); app.app_context().push(); db.create_all()"`
+   - **Auto-Deploy**: On (Mantener activado)
 
 ### Opción 2: Despliegue con render.yaml
 
@@ -100,6 +104,17 @@ python keep_alive.py https://tu-app.onrender.com --interval 10
 
 ## Solución de Problemas
 
+### Error "Requires Payment Information"
+
+Si Render.com solicita información de pago, asegúrate de:
+
+1. Verificar que en `render.yaml` la propiedad `plan:` esté establecida como `free` tanto para el servicio web como para la base de datos
+2. Si estás creando manualmente el servicio, asegúrate de seleccionar "Free" como Instance Type
+3. Si continúa solicitando información de pago, prueba la siguiente alternativa:
+   - Elimina la base de datos PostgreSQL del `render.yaml`
+   - Crea el servicio web utilizando el método manual (Opción 1)
+   - Crea la base de datos PostgreSQL manualmente después
+
 ### Error de Base de Datos
 
 Si encuentras errores relacionados con la base de datos:
@@ -108,6 +123,7 @@ Si encuentras errores relacionados con la base de datos:
 2. Busca errores específicos relacionados con la base de datos
 3. Verifica que la variable `DATABASE_URL` esté configurada correctamente
 4. Asegúrate de que la URL comience con `postgresql://` (no `postgres://`)
+5. Comprueba que se haya ejecutado correctamente el comando pre-deploy para inicializar la base de datos
 
 ### Error de Aplicación
 
@@ -116,6 +132,7 @@ Si la aplicación no se inicia:
 1. Ve a la pestaña "Logs" del servicio web
 2. Busca errores específicos relacionados con la aplicación
 3. Verifica que todas las variables de entorno estén configuradas correctamente
+4. Si hay problemas con módulos Python, prueba a actualizar `requirements.txt` y volver a desplegar
 
 ### Problemas con Google Gemini API
 

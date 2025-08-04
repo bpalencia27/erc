@@ -14,3 +14,8 @@ def get_partial(partial_name):
     except Exception as e:
         current_app.logger.error(f"Error loading partial {partial_name}: {e}")
         return '', 404
+
+@bp.route('/healthz')
+def health_check():
+    """Endpoint para health checks de Render.com."""
+    return {"status": "ok"}, 200
