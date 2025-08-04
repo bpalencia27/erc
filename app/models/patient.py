@@ -2,7 +2,7 @@
 Modelo de paciente para la aplicación ERC Insight
 """
 from datetime import datetime
-from app import db
+from app.extensions import db
 
 class Patient(db.Model):
     """Modelo para almacenar información de pacientes."""

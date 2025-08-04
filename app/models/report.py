@@ -2,7 +2,7 @@
 Modelo para informes médicos generados
 """
 from datetime import datetime
-from app import db
+from app.extensions import db
 
 class Report(db.Model):
     """Modelo para almacenar informes médicos generados."""

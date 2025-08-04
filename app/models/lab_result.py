@@ -2,7 +2,7 @@
 Modelo para almacenar resultados de laboratorio
 """
 from datetime import datetime
-from app import db
+from app.extensions import db
 
 class LabResult(db.Model):
     """Modelo para almacenar los resultados de laboratorio de un paciente."""

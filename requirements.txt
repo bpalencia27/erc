@@ -23,3 +23,5 @@ email-validator==2.1.0
 Pillow==10.1.0
 pytest==7.4.3
 pytest-cov==4.1.0
+psycopg2-binary==2.9.9  # Para conexión con PostgreSQL
+whitenoise==6.6.0  # Para servir archivos estáticos en producción

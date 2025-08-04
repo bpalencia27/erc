@@ -73,24 +73,31 @@ gunicorn -w 4 wsgi:app
   - `static/`: Archivos estáticos
   - `templates/`: Plantillas HTML
 
-## Despliegue en Render.com
+## Despliegue en Render.com (Plan Gratuito)
 
-ERC Insight está optimizado para despliegue en Render.com. El archivo `render.yaml` incluye la configuración necesaria.
+Este proyecto está optimizado para despliegue en Render.com utilizando el plan gratuito. Para instrucciones detalladas, consulta:
 
-### Instrucciones de despliegue
+1. `RENDER_FREE_DEPLOYMENT.md` - Guía paso a paso para despliegue con plan gratuito
+2. `pre_deploy_check.py` - Script para verificar que todo esté listo para el despliegue
+3. `keep_alive.py` - Script para mantener la aplicación activa (evitar hibernación)
 
-1. Crea una cuenta en Render.com si aún no tienes una
-2. Conecta tu repositorio de GitHub a Render
-3. Selecciona "Blueprint" al crear un nuevo servicio y selecciona el repositorio
-4. Render detectará automáticamente el archivo `render.yaml` y configurará los servicios
-5. Configura las variables de entorno necesarias (ver `ENV_INSTRUCTIONS.md`)
-6. Haz clic en "Apply" para iniciar el despliegue
+### Pasos rápidos para despliegue
 
-La aplicación usará automáticamente la configuración de producción al desplegarse en Render.com.
+1. Asegúrate de que tu código esté en GitHub
+2. Crea una cuenta en Render.com
+3. Crea un servicio web conectado a tu repositorio
+4. Configura una base de datos PostgreSQL
+5. Configura las variables de entorno
+6. Despliega la aplicación
+
+Para más detalles, ejecuta:
+```
+python pre_deploy_check.py
+```
 
 ## Variables de Entorno
 
-Consulta el archivo `ENV_INSTRUCTIONS.md` para detalles sobre las variables de entorno necesarias.
+Consulta el archivo `.env.example` y `ENV_INSTRUCTIONS.md` para detalles sobre las variables de entorno necesarias.
 
 ## Licencia
 
