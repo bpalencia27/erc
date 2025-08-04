@@ -6,21 +6,201 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
+from dotenv import load_dotenv
+from app.utils.caching import cached_result
+from google.generativeai import GenerativeModel
+from flask import current_app
 
-# En una implementación real, importaríamos google.generativeai
-# Este es un ejemplo simplificado para ilustrar la estructura
+# Cargar variables de entorno
+load_dotenv()
+
+def get_gemini_client():
+    api_key = os.environ.get('GEMINI_API_KEY')
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY no está configurada en las variables de entorno")
+    
+    return GenerativeModel(model_name="gemini-pro", api_key=api_key)
 
 class GeminiClient:
     """Cliente para interactuar con la API de Google Gemini."""
     
     def __init__(self):
-        """Inicializa el cliente con la API key y configura el modelo."""
-        self.api_key = os.environ.get('GOOGLE_AI_API_KEY')
-        if not self.api_key:
+        """Inicializa el cliente con la API key de Gemini."""
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        self.use_simulation = not self.api_key
+        
+        if self.use_simulation:
             logging.warning("API key de Google Gemini no configurada, usando modo simulado")
+        else:
+            # Configurar la API de Gemini con la clave
+            self.model = get_gemini_client()
+    
+    def extract_lab_results(self, text):
+        """Extrae resultados de laboratorio desde un texto utilizando IA."""
+        if self.use_simulation:
+            # Modo simulado cuando no hay API key
+            return {
+                "results": {
+                    "creatinina": {"value": "1.2", "unit": "mg/dL"},
+                    "glucosa": {"value": "105", "unit": "mg/dL"},
+                    "ldl": {"value": "110", "unit": "mg/dL"}
+                }
+            }
+            
+        prompt = f"""
+        Analiza el siguiente texto de un reporte médico y extrae los valores de laboratorio.
+        Por favor, extrae con precisión los siguientes datos:
         
-        # En una implementación real, aquí se configuraría la API de Gemini
+        1. Datos del paciente (nombre, edad, sexo, fecha del informe)
+        2. Valores de laboratorio, prestando especial atención a:
+           - Creatinina (mg/dL)
+           - Glucosa (mg/dL)
+           - Colesterol total, LDL, HDL (mg/dL)
+           - Triglicéridos (mg/dL)
+           - Potasio, Sodio (mEq/L)
+           - Calcio, Fósforo (mg/dL)
+           - Hemoglobina (g/dL)
+           - PTH (pg/mL)
+           - Albúmina (g/dL)
+           - HbA1c (%)
+           - Ácido úrico (mg/dL)
+           - Urea o BUN (mg/dL)
         
+        Devuelve un objeto JSON con este formato exacto:
+        {{
+            "patient_data": {{
+                "nombre": "Nombre del paciente",
+                "edad": "65",
+                "sexo": "m/f",
+                "fecha_informe": "YYYY-MM-DD"
+            }},
+            "results": {{
+                "creatinina": {{ "value": "1.2", "unit": "mg/dL" }},
+                "glucosa": {{ "value": "110", "unit": "mg/dL" }},
+                ...
+            }}
+        }}
+        
+        Texto a analizar:
+        {text}
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            result_text = response.text
+            
+            # Extraer solo el JSON (eliminar cualquier texto adicional)
+            json_start = result_text.find('{')
+            json_end = result_text.rfind('}') + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = result_text[json_start:json_end]
+                return json.loads(json_str)
+            else:
+                # Si no se encuentra un JSON válido, devolver vacío
+                logging.warning(f"No se pudo extraer JSON de la respuesta: {result_text}")
+                return {}
+                
+        except Exception as e:
+            logging.error(f"Error al extraer resultados con IA: {str(e)}")
+            logging.error(f"Respuesta original: {response.text if 'response' in locals() else 'N/A'}")
+            return {}
+        
+    def generate_patient_report(self, patient_data):
+        """Genera un informe clínico completo basado en los datos del paciente."""
+        if self.use_simulation:
+            # Modo simulado cuando no hay API key
+            return """
+            <h3>Evaluación Médica del Paciente</h3>
+            <p>Este es un informe simulado ya que no se ha configurado la API key de Google Gemini.</p>
+            <p>Por favor, configure la variable de entorno GEMINI_API_KEY para obtener informes reales.</p>
+            """
+            
+        # Preparar datos para el prompt
+        nombre = patient_data.get('nombre', 'Paciente')
+        edad = patient_data.get('edad', '')
+        sexo = 'Masculino' if patient_data.get('sexo') == 'm' else 'Femenino'
+        diagnosticos = ', '.join(patient_data.get('diagnosticos', [])) or 'Ninguno'
+        
+        # Datos de laboratorio
+        lab_results = patient_data.get('labResults', {})
+        lab_text = ""
+        for key, value in lab_results.items():
+            if isinstance(value, dict):
+                lab_text += f"- {key.capitalize()}: {value.get('value')} {value.get('unit', '')}\n"
+        
+        # Medicamentos
+        medicamentos = patient_data.get('medicamentos', [])
+        med_text = ""
+        for med in medicamentos:
+            med_text += f"- {med.get('nombre', '')} {med.get('dosis', '')} {med.get('frecuencia', '')}\n"
+        
+        # Crear prompt
+        prompt = f"""
+        Genera un informe clínico detallado en formato HTML para el siguiente paciente:
+        
+        DATOS BÁSICOS:
+        - Nombre: {nombre}
+        - Edad: {edad} años
+        - Sexo: {sexo}
+        - IMC: {patient_data.get('imc', 'No disponible')}
+        - TFG: {patient_data.get('tfg', 'No disponible')}
+        - Riesgo Cardiovascular: {patient_data.get('riesgoCardiovascular', 'No calculado')}
+        
+        DIAGNÓSTICOS:
+        {diagnosticos}
+        
+        RESULTADOS DE LABORATORIO:
+        {lab_text if lab_text else "No disponibles"}
+        
+        MEDICAMENTOS ACTUALES:
+        {med_text if med_text else "No hay medicamentos registrados"}
+        
+        PRESIÓN ARTERIAL:
+        {self._format_blood_pressure(patient_data.get('presionArterial', []))}
+        
+        NOTAS ADICIONALES:
+        - Condición de fragilidad: {"Sí" if patient_data.get('fragil') else "No"}
+        - Adherencia al tratamiento: {patient_data.get('adherencia', 'No especificada')}
+        - Barreras de acceso: {"Sí" if patient_data.get('barrerasAcceso') else "No"}
+        
+        Por favor, genera un informe clínico completo que incluya:
+        1. Una evaluación general del paciente.
+        2. Análisis de riesgo cardiovascular.
+        3. Interpretación de los resultados de laboratorio.
+        4. Recomendaciones de tratamiento y ajustes de medicación si fuera necesario.
+        5. Plan de seguimiento.
+        
+        El informe debe estar en formato HTML con secciones claramente definidas. Usa tags como <h3> para títulos de sección, <p> para párrafos, <ul> y <li> para listas, y <strong> para énfasis. Evita usar clases CSS o estilos complejos.
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            html_content = response.text
+            
+            # Limpiar el HTML si es necesario
+            if "```html" in html_content:
+                html_content = html_content.split("```html")[1].split("```")[0].strip()
+            elif "```" in html_content:
+                html_content = html_content.split("```")[1].split("```")[0].strip()
+            
+            return html_content
+            
+        except Exception as e:
+            logging.error(f"Error al generar informe con IA: {str(e)}")
+            return f"<p>Error al generar informe: {str(e)}</p>"
+    
+    def _format_blood_pressure(self, blood_pressure_data):
+        """Formatea los datos de presión arterial para el prompt."""
+        if not blood_pressure_data:
+            return "No hay registros de presión arterial"
+            
+        result = ""
+        for bp in blood_pressure_data:
+            result += f"- {bp.get('sistolica', '')}/{bp.get('diastolica', '')} mmHg (Fecha: {bp.get('fecha', 'No registrada')})\n"
+            
+        return result
+    
     def generate_medical_report(self, patient_data, report_type="complete"):
         """
         Genera un informe médico basado en los datos del paciente.
@@ -32,6 +212,10 @@ class GeminiClient:
         Returns:
             str: Texto del informe generado
         """
+        # Verificar modo de simulación
+        if self.use_simulation:
+            return self._generate_simulated_report(patient_data, report_type)
+            
         try:
             # Construir el prompt según el tipo de informe
             if report_type == "complete":
@@ -42,20 +226,17 @@ class GeminiClient:
                 prompt = self._build_follow_up_prompt(patient_data)
             else:
                 prompt = self._build_complete_report_prompt(patient_data)
-            
-            # Si no hay API key, usar modo simulado
-            if not self.api_key:
-                return self._generate_simulated_report(patient_data, report_type)
-            
-            # En una implementación real, aquí se enviaría el prompt a la API de Gemini
-            # Por ahora, usamos un informe simulado
-            return self._generate_simulated_report(patient_data, report_type)
+                
+            # Llamar a la API de Gemini
+            response = self.model.generate_content(prompt)
+            return self._process_ai_response(response)
             
         except Exception as e:
             logging.error(f"Error al generar informe con Gemini: {str(e)}")
             # Devolver un informe de respaldo
             return self._generate_fallback_report(patient_data)
     
+    @cached_result(expiration_seconds=3600)  # Cachear por 1 hora
     def process_advanced_evaluation(self, payload: Dict[str, Any]) -> str:
         """
         Procesa una evaluación avanzada y genera un informe detallado.

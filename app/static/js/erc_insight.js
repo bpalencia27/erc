@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabContents = document.querySelectorAll('.tab-content');
 
     // --- Configuración de la API ---
-    const GEMINI_API_KEY = "AIzaSyAIhzuQyGu6ImUjSYzBnVxE8v9Z_TDwqZU"; // Usamos la primera clave proporcionada
     const BACKEND_URL = "/api"; // URL base para las llamadas a tu backend Flask
 
     // --- Inicialización de elementos UI ---
@@ -858,16 +857,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const parseLabReportWithGemini = async (text) => {
         const prompt = `Analiza el siguiente reporte de laboratorio de Colombia. Extrae los valores en formato JSON. Devuelve única y exclusivamente el objeto JSON sin texto adicional, explicaciones o markdown. El JSON debe contener "nombre_paciente", "edad_paciente", "sexo_paciente" ('m' o 'f'), "fecha_informe" (YYYY-MM-DD), y un array "resultados" con objetos {"nombre", "resultado", "unidades"}. Valores clave a extraer: creatinina en suero, hemoglobina glicosilada, colesterol ldl, colesterol hdl, trigliceridos, relacion microalbuminuria creatinina, glucosa, pth, albumina, sodio, potasio, fosforo, acido urico, calcio, hemoglobina, ferritina, bun. Texto:\n\n${text}`;
         
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
-        const payload = { contents: [{ parts: [{ text: prompt }] }] };
-        
-        const response = await fetch(apiUrl, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify(payload) 
+        // Usar el backend para parsear el reporte
+        const response = await fetch(`${BACKEND_URL}/parse_document`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                text: text,
+                use_ai: true
+            })
         });
         
         if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+        
         
         const result = await response.json();
         const rawText = result.candidates[0].content.parts[0].text;
@@ -1039,13 +1040,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 * ${predialysisPrompt}
         `;
 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
-        const payload = { contents: [{ parts: [{ text: prompt }] }] };
-        
-        const response = await fetch(apiUrl, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify(payload) 
+        // Usar el backend para generar el informe
+        const response = await fetch(`${BACKEND_URL}/generate_report`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                patient_data: data,
+                prompt_template: prompt 
+            })
         });
         
         if (!response.ok) throw new Error(`API Error: ${response.statusText}`);

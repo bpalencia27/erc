@@ -1,0 +1,36 @@
+<section>
+    <h2 class="text-xl font-bold mb-4 border-l-4 border-primary pl-3">Datos del Paciente</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+        <div>
+            <label for="nombre" class="font-medium text-sm mb-1 block">Nombre Completo <span class="text-red-500">*</span></label>
+            <input type="text" id="nombre" name="nombre" class="input-field" required>
+        </div>
+        <div>
+            <label for="edad" class="font-medium text-sm mb-1 block">Edad (años) <span class="text-red-500">*</span></label>
+            <input type="number" id="edad" name="edad" class="input-field" min="1" required>
+        </div>
+        <div>
+            <label for="sexo" class="font-medium text-sm mb-1 block">Sexo <span class="text-red-500">*</span></label>
+            <select id="sexo" name="sexo" class="input-field" required>
+                <option value="m">Masculino</option>
+                <option value="f">Femenino</option>
+            </select>
+        </div>
+         <div>
+            <label for="peso" class="font-medium text-sm mb-1 block">Peso (kg) <span class="text-red-500">*</span></label>
+            <input type="number" id="peso" name="peso" step="0.1" class="input-field" required>
+        </div>
+         <div>
+            <label for="talla" class="font-medium text-sm mb-1 block">Talla (cm)</label>
+            <input type="number" id="talla" name="talla" class="input-field">
+        </div>
+        <div>
+             <label for="imc" class="font-medium text-sm mb-1 block">Índice de Masa Corporal (IMC)</label>
+             <input type="text" id="imc" name="imc" class="input-field bg-gray-100" readonly>
+        </div>
+        <div>
+            <label for="per_abd" class="font-medium text-sm mb-1 block">Perímetro Abdominal (cm)</label>
+            <input type="number" id="per_abd" name="per_abd" class="input-field">
+        </div>
+    </div>
+</section>

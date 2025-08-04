@@ -1,0 +1,29 @@
+<section>
+    <h2 class="text-xl font-bold mb-4 border-l-4 border-primary pl-3">Diagnósticos y Condiciones</h2>
+    <div class="space-y-4">
+        <div>
+            <label class="font-medium text-sm mb-2 block">Diagnósticos Principales <span class="text-red-500">*</span></label>
+            <div id="main-diagnostics" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label class="checkbox-card"><input type="checkbox" name="diagnostico" value="HTA" class="h-5 w-5 mr-4"><span class="content">Hipertensión (HTA)</span></label>
+                <label class="checkbox-card"><input type="checkbox" name="diagnostico" value="DM" id="dm-checkbox" class="h-5 w-5 mr-4"><span class="content">Diabetes (DM)</span></label>
+                <label class="checkbox-card"><input type="checkbox" name="diagnostico" value="ERC" id="erc-checkbox" class="h-5 w-5 mr-4"><div class="flex items-center content"><span>ERC</span><div id="erc-alert-icon" class="tooltip ml-2 hidden"><svg class="w-5 h-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg><span class="tooltip-text">ERC Estadio ≥3 o Albuminuria >30 mg/g.</span></div></div></label>
+            </div>
+        </div>
+        <div id="duracion-dm-container" class="hidden">
+             <label for="duracion_dm" class="font-medium text-sm mb-1 block">Duración DM (años)</label>
+             <input type="number" id="duracion_dm" name="duracion_dm" class="input-field w-full md:w-1/2" min="0">
+        </div>
+        <div>
+            <label class="font-medium text-sm mb-2 block">Condiciones Adicionales</label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="checkbox-card"><input type="checkbox" id="ecv_establecida" name="ecv_establecida" class="h-5 w-5 mr-4"><span class="content">Enf. Cardiovascular Establecida</span></label>
+                <label class="checkbox-card"><input type="checkbox" id="tabaquismo" name="tabaquismo" class="h-5 w-5 mr-4"><span class="content">Tabaquismo Activo</span></label>
+                <label class="checkbox-card"><input type="checkbox" id="cond_socioeconomicas" name="cond_socioeconomicas" class="h-5 w-5 mr-4"><div class="flex items-center content"><span>Cond. Socioeconómicas Adversas</span></div></label>
+                <div class="flex items-center">
+                    <label class="checkbox-card flex-grow"><input type="checkbox" id="fragil" name="fragil" class="h-5 w-5 mr-4" disabled><span class="content">Paciente Frágil</span></label>
+                    <button type="button" id="eval-fragilidad-btn" class="ml-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-3 rounded-lg transition-colors" aria-label="Evaluar fragilidad">Evaluar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

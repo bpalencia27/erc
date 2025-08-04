@@ -15,8 +15,9 @@ ERC Insight es una plataforma web para el análisis clínico de pacientes con en
 
 ## Requisitos
 
-- Python 3.9+
+- Python 3.9.13
 - Flask 2.3+
+- PostgreSQL (para producción)
 - Otras dependencias listadas en requirements.txt
 
 ## Instalación
@@ -43,7 +44,7 @@ ERC Insight es una plataforma web para el análisis clínico de pacientes con en
    ```
    FLASK_APP=wsgi.py
    FLASK_ENV=development
-   GOOGLE_AI_API_KEY=tu-api-key-de-gemini
+   GEMINI_API_KEY=tu-api-key-de-gemini
    SECRET_KEY=tu-clave-secreta
    ```
 
@@ -72,9 +73,24 @@ gunicorn -w 4 wsgi:app
   - `static/`: Archivos estáticos
   - `templates/`: Plantillas HTML
 
-## Despliegue en PythonAnywhere
+## Despliegue en Render.com
 
-Ver la documentación detallada en `docs/deployment.md`
+ERC Insight está optimizado para despliegue en Render.com. El archivo `render.yaml` incluye la configuración necesaria.
+
+### Instrucciones de despliegue
+
+1. Crea una cuenta en Render.com si aún no tienes una
+2. Conecta tu repositorio de GitHub a Render
+3. Selecciona "Blueprint" al crear un nuevo servicio y selecciona el repositorio
+4. Render detectará automáticamente el archivo `render.yaml` y configurará los servicios
+5. Configura las variables de entorno necesarias (ver `ENV_INSTRUCTIONS.md`)
+6. Haz clic en "Apply" para iniciar el despliegue
+
+La aplicación usará automáticamente la configuración de producción al desplegarse en Render.com.
+
+## Variables de Entorno
+
+Consulta el archivo `ENV_INSTRUCTIONS.md` para detalles sobre las variables de entorno necesarias.
 
 ## Licencia
 

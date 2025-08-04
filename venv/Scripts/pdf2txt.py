@@ -1,4 +1,4 @@
-#!C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\Scripts\python.exe
+#!G:\Mi unidad\RCV IA\venv\Scripts\python.exe
 """A command line tool for extracting text and images from PDF and
 output it to plain text, html, xml or tags."""
 import argparse

@@ -1,4 +1,4 @@
-2025-08-03 12:45:37,472 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
+2025-08-03 22:42:41,436 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
 Traceback (most recent call last):
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 2190, in wsgi_app
     response = self.full_dispatch_request()
@@ -22,16 +22,16 @@ Traceback (most recent call last):
     raise rewrite_traceback_stack(source=source)
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\index.html", line 1, in top-level template code
     {% extends "base.html" %}
-  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 26, in top-level template code
-    <a class="nav-link" href="{{ url_for('uploader.upload_form') }}">Cargar Documento</a>
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 23, in top-level template code
+    <a class="nav-link" href="{{ url_for('patient.index') }}">Pacientes</a>
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1697, in url_for
     return self.handle_url_build_error(error, endpoint, values)
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1686, in url_for
     rv = url_adapter.build(  # type: ignore[union-attr]
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\werkzeug\routing\map.py", line 950, in build
     raise BuildError(endpoint, values, method, self)
-werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'uploader.upload_form'. Did you mean 'patient.calculate_tfg' instead?
-2025-08-03 12:45:37,995 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'patient.index'. Did you mean 'main.index' instead?
+2025-08-03 22:46:14,687 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
 Traceback (most recent call last):
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 2190, in wsgi_app
     response = self.full_dispatch_request()
@@ -55,7 +55,7 @@ Traceback (most recent call last):
     raise rewrite_traceback_stack(source=source)
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\index.html", line 1, in top-level template code
     {% extends "base.html" %}
-  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 26, in top-level template code
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 23, in top-level template code
     <a class="nav-link" href="{{ url_for('uploader.upload_form') }}">Cargar Documento</a>
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1697, in url_for
     return self.handle_url_build_error(error, endpoint, values)
@@ -63,8 +63,8 @@ Traceback (most recent call last):
     rv = url_adapter.build(  # type: ignore[union-attr]
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\werkzeug\routing\map.py", line 950, in build
     raise BuildError(endpoint, values, method, self)
-werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'uploader.upload_form'. Did you mean 'patient.calculate_tfg' instead?
-2025-08-03 12:45:38,148 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'patient.index'. Did you mean 'main.index' instead?
+2025-08-03 22:46:15,621 ERROR: Exception on / [GET] [in C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py:1414]
 Traceback (most recent call last):
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 2190, in wsgi_app
     response = self.full_dispatch_request()
@@ -88,7 +88,7 @@ Traceback (most recent call last):
     raise rewrite_traceback_stack(source=source)
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\index.html", line 1, in top-level template code
     {% extends "base.html" %}
-  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 26, in top-level template code
+  File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\app\templates\base.html", line 23, in top-level template code
     <a class="nav-link" href="{{ url_for('uploader.upload_form') }}">Cargar Documento</a>
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\flask\app.py", line 1697, in url_for
     return self.handle_url_build_error(error, endpoint, values)
@@ -96,4 +96,12 @@ Traceback (most recent call last):
     rv = url_adapter.build(  # type: ignore[union-attr]
   File "C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\lib\site-packages\werkzeug\routing\map.py", line 950, in build
     raise BuildError(endpoint, values, method, self)
-werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'uploader.upload_form'. Did you mean 'patient.calculate_tfg' instead?
+werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'patient.index'. Did you mean 'main.index' instead?
+2025-08-03 22:57:37,503 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-03 22:57:37,852 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-03 22:58:18,370 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-03 22:59:49,120 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-03 22:59:54,656 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-03 23:00:05,728 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-03 23:00:06,023 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-03 23:01:05,540 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]

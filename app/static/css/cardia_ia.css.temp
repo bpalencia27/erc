@@ -1,0 +1,18 @@
+.input-group {
+    position: relative;
+}
+
+.clear-value-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 5;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.3rem;
+    margin: 3px;
+    border-radius: 4px;
+}
+
+.custom-select {
+    padding-right: 30px !important;
+}

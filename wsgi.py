@@ -3,7 +3,8 @@ Punto de entrada para servidor WSGI en producción
 """
 from app import create_app
 
-app = create_app('config.ProductionConfig')
+# Usamos explícitamente la configuración de producción
+app = create_app('production')
 
-if __name__ == "__main__":
-    app.run()
+if __name__ == '__main__':
+    app.run(debug=False)

@@ -1,83 +1,94 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
+from config import config
 import os
-import logging
 from logging.handlers import RotatingFileHandler
+import logging
+from app.extensions import db, migrate
 
-# Crear instancia de SQLAlchemy
-db = SQLAlchemy()
-migrate = Migrate()
-
-def create_app(config_class='config.ProductionConfig'):
-    """Inicializa y configura la aplicación Flask."""
-    
-    # Crear y configurar la app
+def create_app(config_name='default'):
+    """Crea y configura la aplicación Flask."""
     app = Flask(__name__)
-    app.config.from_object(config_class)
     
-    # Configurar CORS
-    CORS(app)
+    # Cargar configuración
+    if isinstance(config_name, str):
+        app.config.from_object(config[config_name])
+    else:
+        app.config.from_object(config_name)
+        
+    # Inicializar la configuración
+    config[config_name].init_app(app)
     
     # Inicializar extensiones
+    CORS(app)
     db.init_app(app)
     migrate.init_app(app, db)
     
     # Configurar logging
-    configure_logging(app)
+    setup_logging(app, config_name)
     
     # Registrar blueprints
-    from app.main import bp as main_bp
-    app.register_blueprint(main_bp)
-
-    from app.upload import bp as uploader_bp
-    app.register_blueprint(uploader_bp, url_prefix='/upload')
-
-    from app.patient import bp as patient_bp
-    app.register_blueprint(patient_bp, url_prefix='/patient')
-
-    from app.report import bp as report_bp
-    app.register_blueprint(report_bp, url_prefix='/report')
+    register_blueprints(app)
     
-    # Crear directorios necesarios
-    create_directories(app)
-    
-    # Ruta de verificación de salud
-    @app.route('/health')
-    def health_check():
-        return {"status": "ok", "version": "1.0.0"}
+    # Registrar comandos CLI
+    from app.commands import register_commands
+    register_commands(app)
     
     return app
 
-def configure_logging(app):
-    """Configura el sistema de logging."""
-    if not os.path.exists('logs'):
-        os.mkdir('logs')
+def setup_logging(app, config_name):
+    """Configura el sistema de logging para la aplicación."""
+    # Crear directorio de logs con ruta absoluta
+    logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir)
     
-    file_handler = RotatingFileHandler(
-        'logs/erc_insight.log', 
-        maxBytes=10240, 
-        backupCount=10
-    )
-    
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
+    # Configurar logging basado en el entorno
+    if config_name == 'production':
+        # En producción, la clase ProductionConfig ya configura el handler de stdout
+        pass
+    else:
+        # En desarrollo, configurar logging a archivo
+        file_handler = RotatingFileHandler(
+            os.path.join(logs_dir, 'erc_insight.log'), 
+            maxBytes=10240, 
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        
     app.logger.setLevel(logging.INFO)
     app.logger.info('ERC Insight startup')
 
-def create_directories(app):
-    """Crea los directorios necesarios para la aplicación."""
-    # Directorio para subida de archivos
-    upload_dir = os.path.join(app.static_folder, 'uploads')
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
+def register_blueprints(app):
+    """Registra todos los blueprints de la aplicación."""
+    from app.main import bp as main_bp
+    app.register_blueprint(main_bp)
     
-    # Directorio para informes generados
-    reports_dir = os.path.join(app.static_folder, 'reports')
-    if not os.path.exists(reports_dir):
-        os.makedirs(reports_dir)
+    from app.api import bp as api_bp
+    app.register_blueprint(api_bp, url_prefix='/api')
+    
+    from app.upload import bp as upload_bp
+    app.register_blueprint(upload_bp, url_prefix='/upload')
+    
+    from app.patient import bp as patient_bp
+    app.register_blueprint(patient_bp, url_prefix='/patient')
+    
+    from app.report import bp as report_bp
+    app.register_blueprint(report_bp, url_prefix='/report')
+    
+    # Añadir otros blueprints según sea necesario
+    try:
+        from app.auth import bp as auth_bp
+        app.register_blueprint(auth_bp, url_prefix='/auth')
+    except ImportError:
+        app.logger.warning("Blueprint 'auth' no encontrado o no configurado correctamente.")
+
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(__file__), 'static', 'uploads'))
+REPORT_FOLDER = os.environ.get('REPORT_FOLDER', os.path.join(os.path.dirname(__file__), 'static', 'reports'))
+
+# Esta parte es redundante ya que lo manejamos en Config.init_app
+# Las carpetas se crearán cuando se inicialice la aplicación

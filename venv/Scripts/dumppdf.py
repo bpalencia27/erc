@@ -1,4 +1,4 @@
-#!C:\Users\brandon\Desktop\erc_insight\erc_insight - Copy\venv\Scripts\python.exe
+#!G:\Mi unidad\RCV IA\venv\Scripts\python.exe
 """Extract pdf structure in XML format"""
 import logging
 import os.path
