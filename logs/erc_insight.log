@@ -1,0 +1,28 @@
+2025-08-05 05:37:49,416 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-05 05:37:50,015 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-05 05:38:12,503 ERROR: Error al analizar documento: unterminated character set at position 0 [in C:\Users\brandon\Desktop\ERC\RCV IA\app\api\routes.py:45]
+2025-08-05 05:38:12,506 ERROR: Traceback (most recent call last):
+  File "C:\Users\brandon\Desktop\ERC\RCV IA\app\api\routes.py", line 26, in parse_document
+    parsed_data = parse_lab_results(text)
+  File "C:\Users\brandon\Desktop\ERC\RCV IA\app\parsers\lab_parser.py", line 286, in parse_lab_results
+    result = parser.parse(text)
+  File "C:\Users\brandon\Desktop\ERC\RCV IA\app\parsers\lab_parser.py", line 137, in parse
+    text_normalized = self._normalize_text(text)
+  File "C:\Users\brandon\Desktop\ERC\RCV IA\app\parsers\lab_parser.py", line 208, in _normalize_text
+    text = re.sub(r'['']', "'", text)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.3568.0_x64__qbz5n2kfra8p0\lib\re.py", line 210, in sub
+    return _compile(pattern, flags).sub(repl, string, count)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.3568.0_x64__qbz5n2kfra8p0\lib\re.py", line 304, in _compile
+    p = sre_compile.compile(pattern, flags)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.3568.0_x64__qbz5n2kfra8p0\lib\sre_compile.py", line 788, in compile
+    p = sre_parse.parse(p, flags)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.3568.0_x64__qbz5n2kfra8p0\lib\sre_parse.py", line 955, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.3568.0_x64__qbz5n2kfra8p0\lib\sre_parse.py", line 444, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.9_3.9.3568.0_x64__qbz5n2kfra8p0\lib\sre_parse.py", line 550, in _parse
+    raise source.error("unterminated character set",
+re.error: unterminated character set at position 0
+ [in C:\Users\brandon\Desktop\ERC\RCV IA\app\api\routes.py:46]
+2025-08-05 06:05:05,446 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
+2025-08-05 06:06:39,925 INFO: ERC Insight startup [in C:\Users\brandon\Desktop\ERC\RCV IA\app\__init__.py:33]
