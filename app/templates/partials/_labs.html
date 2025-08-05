@@ -1,0 +1,31 @@
+<section>
+    <h2 class="text-xl font-bold mb-4 border-l-4 border-primary pl-3">Laboratorios</h2>
+     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mb-4">
+         <div>
+            <label for="creatinina" class="font-medium text-sm mb-1 block">Creatinina Sérica (mg/dL) <span class="text-red-500">*</span></label>
+            <div class="flex gap-2">
+                <input type="number" id="creatinina" name="creatinina" step="0.01" class="input-field" required>
+                <input type="date" id="creatinina_date" name="creatinina_date" class="input-field">
+            </div>
+        </div>
+        <div>
+            <label class="font-medium text-sm mb-1 block">TFG (Cockcroft-Gault)</label>
+            <input type="text" id="tfg-display" class="input-field bg-gray-100" readonly>
+        </div>
+    </div>
+    <label class="flex items-center text-sm my-4 cursor-pointer"><input type="checkbox" id="manual-lab-toggle" class="h-4 w-4 rounded mr-2 accent-primary"> Ingresar otros laboratorios manualmente</label>
+    <div id="lab-upload-container" class="p-4 rounded-lg border border-dashed file-drop-area">
+        <div class="text-center">
+            <i class="fas fa-cloud-upload-alt text-3xl text-gray-400"></i>
+            <p class="mt-2 text-sm text-gray-600">Arrastra y suelta archivos (.pdf, .txt)</p>
+            <p class="text-xs text-gray-500 mt-1">o</p>
+            <button type="button" onclick="document.getElementById('lab-file-upload').click()" class="mt-2 text-sm font-semibold text-primary hover:underline">Selecciona archivos</button>
+            <input type="file" id="lab-file-upload" accept=".txt,.pdf" class="hidden" multiple/>
+        </div>
+    </div>
+    <div id="file-loader" class="mt-2 hidden items-center gap-2 text-sm text-primary"><div class="loader !w-5 !h-5"></div><span>Analizando archivos...</span></div>
+    <div id="manual-lab-inputs" class="hidden space-y-4 mt-4">
+        </div>
+    <div id="loaded-labs-container" class="mt-4 space-y-2">
+        </div>
+</section>

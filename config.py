@@ -1,52 +1,101 @@
 """
-Configuración de la aplicación
+Configuración centralizada para ERC Insight
+Actualizado: Agosto 2025
 """
 import os
-from dotenv import load_dotenv
+import secrets
+from pathlib import Path
+from pydantic_settings import BaseSettings
+from typing import Optional
+import logging
 
-# Cargar variables de entorno desde .env
-load_dotenv()
+logger = logging.getLogger("erc_insight")
 
-class Config:
-    """Configuración base adaptable a Render y desarrollo local."""
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'una-clave-secreta-muy-dificil-de-adivinar'
-    UPLOAD_FOLDER = 'app/static/uploads'
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload
+# Configurar logger
+class Settings(BaseSettings):
+    """Configuración con validación usando Pydantic v2"""
+    
+    # Flask Config
+    SECRET_KEY: str = secrets.token_urlsafe(32)
+    FLASK_APP: str = "wsgi.py"
+    FLASK_ENV: str = "development"
+    DEBUG: bool = False
+    TESTING: bool = False
+    
+    # Database
+    DATABASE_URL: Optional[str] = None
+    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+    SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
+    SQLALCHEMY_ENGINE_OPTIONS: dict = {
+        "pool_size": 10,
+        "pool_recycle": 3600,
+        "pool_pre_ping": True,
+        "max_overflow": 20
+    }
+    
+    # Google Gemini API
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-1.5-pro"
+    GEMINI_TEMPERATURE: float = 0.7
+    GEMINI_MAX_TOKENS: int = 8192
+    
+    # File Upload
+    UPLOAD_FOLDER: Path = Path("uploads")
+    MAX_CONTENT_LENGTH: int = 16 * 1024 * 1024  # 16MB max
+    ALLOWED_EXTENSIONS: set = {'.pdf', '.txt', '.png', '.jpg', '.jpeg'}
+    
+    # Security
+    SESSION_COOKIE_SECURE: bool = True
+    SESSION_COOKIE_HTTPONLY: bool = True
+    SESSION_COOKIE_SAMESITE: str = "Lax"
+    WTF_CSRF_ENABLED: bool = True
+    WTF_CSRF_TIME_LIMIT: Optional[int] = None
+    
+    # Caching
+    CACHE_TYPE: str = "RedisCache"
+    CACHE_REDIS_URL: str = "redis://localhost:6379/0"
+    CACHE_DEFAULT_TIMEOUT: int = 300
+    
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    LOG_TO_STDOUT: bool = True
+    SENTRY_DSN: Optional[str] = None
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
 
-    # Configuración de base de datos
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
-    # Fix para Render: convertir postgres:// a postgresql://
-    if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
-        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
-    if not SQLALCHEMY_DATABASE_URI:
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///erc_insight.db'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+# Configuraciones por entorno
+class DevelopmentConfig(Settings):
+    DEBUG: bool = True
+    FLASK_ENV: str = "development"
+    LOG_LEVEL: str = "DEBUG"
+    SESSION_COOKIE_SECURE: bool = False
 
-    # Configuración de Gemini API
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_AI_API_KEY')
+class ProductionConfig(Settings):
+    DEBUG: bool = False
+    FLASK_ENV: str = "production"
+    LOG_LEVEL: str = "WARNING"
+    
+class TestingConfig(Settings):
+    TESTING: bool = True
+    WTF_CSRF_ENABLED: bool = False
+    SQLALCHEMY_DATABASE_URI: str = "sqlite:///:memory:"
 
-    # Configuración de logging
-    LOG_TO_STDOUT = os.environ.get('LOG_TO_STDOUT')
+# Factory pattern para obtener configuración
+def get_config(env: str = None) -> Settings:
+    """Obtiene la configuración según el entorno"""
+    env = env or os.getenv('FLASK_ENV', 'development')
+    
+    configs = {
+        'development': DevelopmentConfig,
+        'production': ProductionConfig,
+        'testing': TestingConfig
+    }
+    
+    config_class = configs.get(env, DevelopmentConfig)
+    return config_class()
 
-class DevelopmentConfig(Config):
-    """Configuración para desarrollo."""
-    DEBUG = True
-    TESTING = False
-
-class TestingConfig(Config):
-    """Configuración para pruebas."""
-    DEBUG = False
-    TESTING = True
-
-class ProductionConfig(Config):
-    """Configuración para producción."""
-    DEBUG = False
-    TESTING = False
-
-# Mapeo de configuraciones
-config = {
-    'development': DevelopmentConfig,
-    'testing': TestingConfig,
-    'production': ProductionConfig,
-    'default': DevelopmentConfig
-}
+# Exportar configuración por defecto
+config = get_config()

@@ -196,22 +196,23 @@ METAS_TERAPEUTICAS = {
     }
 }
 
-def calcular_tfg_ckd_epi(creatinina, edad, sexo, raza="no_negro", peso=70):
+def calcular_tfg_cockcroft_gault(creatinina, edad, sexo, peso):
     """
     Calcula la Tasa de Filtración Glomerular utilizando la fórmula de Cockcroft-Gault.
     
     Args:
         creatinina (float): Nivel de creatinina en mg/dL
         edad (int): Edad del paciente en años
-        sexo (str): Sexo del paciente ('M' para masculino, 'F' para femenino)
-        raza (str): Este parámetro se mantiene por compatibilidad pero no se usa en Cockcroft-Gault
-        peso (float): Peso del paciente en kg (valor por defecto si no se proporciona)
+        sexo (str): 'M' para masculino, 'F' para femenino
+        peso (float): Peso del paciente en kg
         
     Returns:
         float: TFG calculada
     """
+    # Validar parámetros de entrada
     if creatinina <= 0:
         creatinina = 1.0
+    
     if edad <= 0 or peso <= 0:
         return 0.0
 
@@ -227,20 +228,20 @@ def determinar_etapa_erc(tfg):
         tfg (float): Tasa de Filtración Glomerular en ml/min/1.73m²
         
     Returns:
-        str: Etapa de ERC ('g1', 'g2', 'g3a', 'g3b', 'g4', 'g5')
+        str: Etapa de ERC (1, 2, 3a, 3b, 4, 5)
     """
     if tfg >= 90:
-        return "g1"
+        return 1
     elif tfg >= 60:
-        return "g2"
+        return 2
     elif tfg >= 45:
-        return "g3a"
+        return "3a"
     elif tfg >= 30:
-        return "g3b"
+        return "3b"
     elif tfg >= 15:
-        return "g4"
+        return 4
     else:
-        return "g5"
+        return 5
 
 def calcular_etapa_erc_para_config(tfg):
     """
@@ -252,7 +253,8 @@ def calcular_etapa_erc_para_config(tfg):
     Returns:
         str: Etapa de ERC en formato 'g1', 'g2', 'g3a', 'g3b', 'g4', 'g5'
     """
-    return determinar_etapa_erc(tfg)
+    etapa = determinar_etapa_erc(tfg)
+    return f"g{etapa}"
 
 def evaluar_fragilidad(respuestas_fried):
     """
@@ -791,7 +793,7 @@ def generar_payload_gemini(paciente, laboratorios):
             valores_lab[key] = lab_data["valor"]
     
     # Calcular TFG
-    tfg = calcular_tfg_ckd_epi(creatinina, edad, sexo, raza, peso)
+    tfg = calcular_tfg_cockcroft_gault(creatinina, edad, sexo, peso)
     
     # Determinar etapa ERC
     etapa_erc = determinar_etapa_erc(tfg)
@@ -860,84 +862,45 @@ def generar_payload_gemini(paciente, laboratorios):
     
     return payload
 
-def evaluar_riesgo_cv(factores):
+def clasificar_riesgo_cv(data, tfg):
     """
-    Evalúa el nivel de riesgo cardiovascular basado en múltiples factores.
+    Función de compatibilidad para clasificar el riesgo cardiovascular.
+    Esta función mantiene la compatibilidad con el código existente que
+    espera una función con esta firma.
     
     Args:
-        factores (dict): Diccionario con factores de riesgo
+        data (dict): Datos del paciente
+        tfg (float): Tasa de Filtración Glomerular
         
     Returns:
-        str: Nivel de riesgo ('BAJO', 'MODERADO', 'ALTO', 'MUY ALTO')
+        str: Nivel de riesgo ('bajo', 'moderado', 'alto', 'muy alto')
     """
-    score = 0
+    # Construir objeto de paciente con los campos necesarios
+    paciente = {
+        "tfg": tfg,
+        "edad": data.get("edad", 0),
+        "sexo": data.get("sexo", "M"),
+        "dm2": data.get("dm2", False),
+        "ecv_establecida": data.get("ecv_establecida", False),
+        "dano_organo_blanco": data.get("dano_organo_blanco", False),
+        "factores_riesgo": data.get("factores_riesgo", []),
+        "duracion_dm": data.get("duracion_dm", 0),
+        "pa_sistolica": data.get("pa_sistolica", 120),
+        "pa_diastolica": data.get("pa_diastolica", 80),
+        "colesterol_ldl": data.get("colesterol_ldl", 0),
+        "factores_potenciadores": data.get("factores_potenciadores", [])
+    }
     
-    # Factores de alto impacto
-    if factores.get('ecv_establecida'):
-        score += 10  # Enfermedad cardiovascular establecida es riesgo muy alto per se
+    # Obtener clasificación usando la función nueva
+    resultado = calcular_riesgo_cardiovascular(paciente)
     
-    # Factores de impacto moderado
-    if factores.get('dm'):
-        score += 3  # Diabetes
-    
-    if factores.get('tfg') is not None:
-        if factores.get('tfg') < 30:
-            score += 5  # ERC severa
-        elif factores.get('tfg') < 45:
-            score += 3  # ERC moderada
-        elif factores.get('tfg') < 60:
-            score += 2  # ERC leve
-    
-    if factores.get('rac') is not None:
-        if factores.get('rac') > 300:
-            score += 3  # Albuminuria severa
-        elif factores.get('rac') > 30:
-            score += 2  # Albuminuria moderada
-    
-    # Factores de menor impacto
-    if factores.get('hipertension'):
-        score += 1
-    
-    if factores.get('tabaquismo'):
-        score += 1
-    
-    if factores.get('edad') is not None and factores.get('edad') > 65:
-        score += 1
-    
-    if factores.get('fragil'):
-        score += 2
-    
-    # Determinación del nivel de riesgo
-    if score >= 10 or (factores.get('dm') and factores.get('tfg') is not None and factores.get('tfg') < 30):
-        return 'MUY ALTO'
-    elif score >= 5:
-        return 'ALTO'
-    elif score >= 2:
-        return 'MODERADO'
+    # Mapear niveles a la terminología anterior
+    nivel = resultado["nivel"]
+    if nivel == "muy alto":
+        return "muy alto"
+    elif nivel == "alto":
+        return "alto"
+    elif nivel == "moderado":
+        return "moderado"
     else:
-        return 'BAJO'
-
-def evaluar_fragilidad(criterios):
-    """
-    Evalúa si un paciente es frágil según los criterios de Fried.
-    
-    Args:
-        criterios (dict): Diccionario con los criterios de Fried
-            - pérdida_peso: bool
-            - debilidad: bool
-            - agotamiento: bool
-            - lentitud: bool
-            - baja_actividad: bool
-            
-    Returns:
-        str: Clasificación ('No Frágil', 'Pre-Frágil', 'Frágil')
-        int: Número de criterios cumplidos
-    """
-    criterios_cumplidos = sum(1 for valor in criterios.values() if valor)
-    
-    if criterios_cumplidos >= 3:
-        return 'Frágil', criterios_cumplidos
-    elif criterios_cumplidos > 0:
-        return 'Pre-Frágil', criterios_cumplidos
-    else:
-        return 'No Frágil', criterios_cumplidos
+        return "bajo"

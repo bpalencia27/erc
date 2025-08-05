@@ -1,68 +1,126 @@
-﻿from flask import Flask
+﻿"""
+Aplicación Flask para ERC Insight
+"""
+import os
+import logging
+from pathlib import Path
+from flask import Flask, render_template, request
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
+from flask_caching import Cache
+from werkzeug.exceptions import HTTPException
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 
-# Instancias globales de extensiones
-db = SQLAlchemy()
-migrate = Migrate()
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 
-def create_app(config_class=None):
-    """Inicializa y configura la aplicación Flask."""
-    if config_class is None:
-        from config import ProductionConfig
-        config_class = ProductionConfig
+logger = logging.getLogger("erc_insight")
+cache = Cache()
 
-    app = Flask(__name__)
-    app.config.from_object(config_class)
-    # Configuración por defecto para tests si no está definida
-    if not app.config.get('SQLALCHEMY_DATABASE_URI'):
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+def create_app(config_name='development'):
+    """Factory pattern para crear la aplicación Flask"""
     
-    # Configurar CORS
-    CORS(app)
+    # Inicializar Flask
+    app = Flask(__name__)
+    
+    # Cargar configuración
+    from config import get_config
+    config = get_config(config_name)
+    app.config.from_object(config)
+    
+    # Inicializar Sentry para monitoreo en producción
+    if config.SENTRY_DSN and config.FLASK_ENV == 'production':
+        sentry_sdk.init(
+            dsn=config.SENTRY_DSN,
+            integrations=[FlaskIntegration()],
+            traces_sample_rate=0.1,
+            profiles_sample_rate=0.1,
+        )
     
     # Inicializar extensiones
-    db.init_app(app)
-    migrate.init_app(app, db)
-    
-    # Configurar logging
-    configure_logging(app)
-    
-    # Registrar blueprints
-    from app.main import bp as main_bp
-    app.register_blueprint(main_bp)
-    
-    from app.patient import bp as patient_bp
-    app.register_blueprint(patient_bp, url_prefix='/patient')
-    
-    from app.upload import bp as upload_bp
-    app.register_blueprint(upload_bp, url_prefix='/upload')
-    
-    from app.report import bp as report_bp
-    app.register_blueprint(report_bp, url_prefix='/report')
-    
-    from app.api import bp as api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    cache.init_app(app)
     
     # Crear directorios necesarios
-    create_directories(app)
+    Path(app.config['UPLOAD_FOLDER']).mkdir(parents=True, exist_ok=True)
+    Path('logs').mkdir(exist_ok=True)
     
-    # Ruta de verificación de salud
-    @app.route('/health')
-    def health_check():
-        return {"status": "ok", "version": "1.0.0"}
+    # Configurar logging
+    if not app.debug and not app.testing:
+        file_handler = logging.handlers.RotatingFileHandler(
+            'logs/erc_insight.log',
+            maxBytes=10240000,
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s '
+            '[in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        app.logger.setLevel(logging.INFO)
+        app.logger.info('ERC Insight startup')
+    
+    # Registrar blueprints
+    register_blueprints(app)
+    
+    # Registrar manejadores de errores
+    register_error_handlers(app)
+    
+    # Registrar filtros de template
+    register_template_filters(app)
+    
+    logger.info(f"Aplicación Flask creada exitosamente - config: {config_name}, debug: {app.debug}")
     
     return app
 
-# Función de logging básica
-def configure_logging(app):
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    app.logger.info("Logging configurado correctamente.")
+def register_blueprints(app):
+    """Registra todos los blueprints de la aplicación"""
+    from app.main import bp as main_bp
+    from app.api import bp as api_bp
+    
+    app.register_blueprint(main_bp)
+    app.register_blueprint(api_bp, url_prefix='/api')
+    
+    logger.debug("Blueprints registrados correctamente")
 
-# Función para crear directorios necesarios
-def create_directories(app):
-    import os
-    upload_folder = app.config.get('UPLOAD_FOLDER', 'uploads')
-    os.makedirs(upload_folder, exist_ok=True)
+def register_error_handlers(app):
+    """Registra manejadores de errores personalizados"""
+    
+    @app.errorhandler(404)
+    def not_found_error(error):
+        logger.warning(f"Página no encontrada: {request.path}")
+        return render_template('errors/404.html'), 404
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        logger.error(f"Error interno del servidor: {str(error)}")
+        return render_template('errors/500.html'), 500
+    
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        if isinstance(e, HTTPException):
+            return e
+        logger.error(f"Error no manejado: {str(e)}", exc_info=True)
+        return render_template('errors/500.html'), 500
+
+def register_template_filters(app):
+    """Registra filtros personalizados para Jinja2"""
+    
+    @app.template_filter('dateformat')
+    def dateformat(value, format='%Y-%m-%d'):
+        """Formatea una fecha"""
+        if value is None:
+            return ""
+        return value.strftime(format)
+    
+    @app.template_filter('currency')
+    def currency(value):
+        """Formatea un valor como moneda"""
+        return f"${value:,.2f}"

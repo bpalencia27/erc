@@ -12,9 +12,15 @@ class ModalManager {
     
     init() {
         if (this.initialized) return;
-        this.setupGlobalListeners();
-        this.setupExistingModals();
-        this.initialized = true;
+        
+        try {
+            this.setupGlobalListeners();
+            this.setupExistingModals();
+            this.initialized = true;
+            console.log('ModalManager inicializado correctamente');
+        } catch (error) {
+            console.error('Error al inicializar ModalManager:', error);
+        }
     }
     
     setupGlobalListeners() {
@@ -27,11 +33,14 @@ class ModalManager {
         });
         
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal-backdrop') || e.target.classList.contains('modal')) {
-                const modal = e.target.closest('.modal') || document.querySelector('.modal.show');
-                if (modal && e.target === modal) {
+            if (e.target.classList.contains('modal-backdrop')) {
+                const modal = document.querySelector('.modal.show');
+                if (modal) {
                     this.closeModal(modal.id || modal);
                 }
+            } else if (e.target.classList.contains('modal') && !e.target.closest('.modal-dialog')) {
+                // Solo cerrar si el clic fue directamente en el modal (fuera del dialog)
+                this.closeModal(e.target.id || e.target);
             }
         });
     }
@@ -43,12 +52,12 @@ class ModalManager {
         ];
         
         document.addEventListener('click', (e) => {
-            if (closeSelectors.some(selector => e.target.matches(selector))) {
+            if (closeSelectors.some(selector => e.target.matches && e.target.matches(selector))) {
                 e.preventDefault();
                 e.stopPropagation();
-                const modal = e.target.closest('.modal, .modal-dialog, [role="dialog"]');
-                if (modal) {
-                    const modalElement = modal.classList.contains('modal') ? modal : modal.closest('.modal');
+                const modalParent = e.target.closest('.modal') || e.target.closest('.modal-dialog') || e.target.closest('[role="dialog"]');
+                if (modalParent) {
+                    const modalElement = modalParent.classList.contains('modal') ? modalParent : modalParent.closest('.modal');
                     if (modalElement) {
                         this.closeModal(modalElement.id || modalElement);
                     }
@@ -86,10 +95,18 @@ class ModalManager {
         } else {
             modal = modalIdOrElement;
             modalId = modal.id || `modal-${Date.now()}`;
+            if (!modal.id) {
+                modal.id = modalId;
+            }
         }
         
         if (!modal) {
             console.error(`Modal no encontrado:`, modalIdOrElement);
+            return;
+        }
+        
+        // Si ya está abierto, no hacer nada
+        if (this.activeModals.has(modalId)) {
             return;
         }
         
@@ -105,16 +122,29 @@ class ModalManager {
         // Añadir el backdrop si no existe
         if (!document.querySelector('.modal-backdrop')) {
             const backdrop = document.createElement('div');
-            backdrop.className = 'modal-backdrop fade show';
+            backdrop.className = 'modal-backdrop fade';
             document.body.appendChild(backdrop);
+            
+            // Forzar un reflow para que la animación funcione
+            backdrop.offsetHeight;
+            backdrop.classList.add('show');
         }
         
         modal.dispatchEvent(new CustomEvent('modal:opened', { detail: { modalId } }));
+        console.log(`Modal abierto: ${modalId}`, { 
+            modalsActivos: [...this.activeModals],
+            modalStack: [...this.modalStack]
+        });
     }
     
     closeModal(modalIdOrElement) {
         let modal;
         let modalId;
+        
+        if (!modalIdOrElement) {
+            console.warn('closeModal: No se proporcionó un modal para cerrar');
+            return;
+        }
         
         if (typeof modalIdOrElement === 'string') {
             modalId = modalIdOrElement;
@@ -139,7 +169,12 @@ class ModalManager {
             const backdrop = document.querySelector('.modal-backdrop');
             if (backdrop) {
                 backdrop.classList.remove('show');
-                setTimeout(() => backdrop.remove(), 150);
+                backdrop.classList.add('fade');
+                setTimeout(() => {
+                    if (backdrop && backdrop.parentNode) {
+                        backdrop.parentNode.removeChild(backdrop);
+                    }
+                }, 150);
             }
             document.body.classList.remove('modal-open');
         }
@@ -148,7 +183,12 @@ class ModalManager {
             modal.style.display = 'none';
             modal.classList.remove('fade');
             modal.removeAttribute('aria-modal');
+            modal.removeAttribute('role');
             modal.dispatchEvent(new CustomEvent('modal:closed', { detail: { modalId } }));
+            console.log(`Modal cerrado: ${modalId}`, { 
+                modalsActivos: [...this.activeModals],
+                modalStack: [...this.modalStack]
+            });
         }, 150);
     }
     
@@ -229,8 +269,14 @@ class ModalManager {
     }
     
     removeNotification(notification) {
-        notification.style.animation = 'slideOut 0.3s ease-out';
-        setTimeout(() => notification.remove(), 300);
+        if (notification && notification.parentNode) {
+            notification.style.animation = 'slideOut 0.3s ease-out';
+            setTimeout(() => {
+                if (notification && notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
     }
     
     closeAllModals() {
@@ -246,6 +292,17 @@ class ModalManager {
     getActiveModals() { 
         return [...this.activeModals]; 
     }
+    
+    // Método de ayuda para depuración
+    debug() {
+        console.log({
+            activeModals: [...this.activeModals],
+            modalStack: [...this.modalStack],
+            bodyHasModalOpenClass: document.body.classList.contains('modal-open'),
+            backdropExists: !!document.querySelector('.modal-backdrop'),
+            visibleModals: document.querySelectorAll('.modal.show').length
+        });
+    }
 }
 
 // Añadir estilos CSS para animaciones y visualización
@@ -255,23 +312,35 @@ modalStyles.textContent = `
     @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
     .notification-animate { animation: slideIn 0.3s ease-out; }
     .modal.fade { transition: opacity 0.15s linear; }
-    .modal.show { opacity: 1; }
+    .modal.show { display: block; opacity: 1; }
     .modal-backdrop.fade { transition: opacity 0.15s linear; }
     .modal-backdrop.show { opacity: 0.5; }
     .notification-toast { box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 4px; }
     .lab-card { transition: all 0.3s ease; }
     .lab-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     .field-locked, .lab-imported { background-color: #f8f9fa !important; cursor: not-allowed; }
+    
+    /* Safari y dispositivos móviles */
+    @supports (-webkit-overflow-scrolling: touch) {
+        .modal-open { position: fixed; width: 100%; }
+    }
 `;
 document.head.appendChild(modalStyles);
 
 // Inicializar el gestor de modales según el estado del documento
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { 
-        window.modalManager = new ModalManager(); 
+        // Comprobar si no existe ya una instancia
+        if (!window.modalManager) {
+            window.modalManager = new ModalManager(); 
+            console.log('ModalManager inicializado al cargar el DOM');
+        }
     });
 } else {
-    window.modalManager = new ModalManager();
+    if (!window.modalManager) {
+        window.modalManager = new ModalManager();
+        console.log('ModalManager inicializado inmediatamente');
+    }
 }
 
 // Exponer la clase para uso global

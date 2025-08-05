@@ -2,12 +2,20 @@ from flask import render_template, current_app
 from app.main import bp
 
 @bp.route('/')
-@bp.route('/index')
 def index():
-    """Renderiza la página principal de la aplicación."""
-    return render_template('index.html', title='ERC Insight - Análisis Clínico Inteligente')
+    """Renderiza la página principal de la aplicación (Single Page App)."""
+    return render_template('base.html', title='CardiaIA - Plataforma de Análisis Clínico Inteligente')
 
-@bp.route('/about')
-def about():
-    """Renderiza la página de información sobre la aplicación."""
-    return render_template('about.html', title='Acerca de ERC Insight')
+@bp.route('/evaluacion')
+def evaluacion():
+    """Renderiza la página de evaluación clínica integral."""
+    return render_template('evaluacion.html')
+
+@bp.route('/partials/<partial_name>')
+def get_partial(partial_name):
+    """Sirve las plantillas parciales para la carga dinámica."""
+    try:
+        return render_template(f'partials/_{partial_name}.html')
+    except Exception as e:
+        current_app.logger.error(f"Error loading partial {partial_name}: {e}")
+        return '', 404

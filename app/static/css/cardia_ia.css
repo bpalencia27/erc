@@ -1,0 +1,547 @@
+/* CardiaIA - Estilos para la plataforma de análisis clínico */
+
+:root {
+    --color-primary: #4C6EF5;
+    --color-primary-light: #5C7CFF;
+    --color-text-main: #333333;
+    --color-text-subtle: #6B7280;
+    --color-border: #E5E7EB;
+    --color-background: #F9FAFB;
+    --color-risk-low: #10B981;
+    --color-risk-moderate: #F59E0B;
+    --color-risk-high: #EF4444;
+    --color-risk-very-high: #991B1B;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--color-background);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}
+
+/* Layout principal */
+.main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    min-height: calc(100vh - 3rem);
+}
+
+@media (max-width: 1024px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.form-panel {
+    background-color: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.report-panel {
+    background-color: var(--color-background);
+    border-radius: 1rem;
+    padding: 2rem;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Formulario y campos */
+.input-field {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.1);
+}
+
+.checkbox-card {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    transition: all 0.15s ease-in-out;
+    cursor: pointer;
+}
+
+.checkbox-card:hover {
+    background-color: var(--color-background);
+}
+
+.checkbox-card input[type="checkbox"]:checked ~ .content {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+/* Loader */
+.loader {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 4px solid rgba(76, 110, 245, 0.2);
+    border-left-color: var(--color-primary);
+    border-radius: 50%;
+    animation: loader-spin 1s linear infinite;
+}
+
+@keyframes loader-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Tooltip */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: 5px;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-weight: normal;
+    font-size: 0.75rem;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Modales */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-backdrop.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 0.75rem;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+    overflow: hidden;
+}
+
+.modal-backdrop.visible .modal-content {
+    transform: scale(1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--color-text-subtle);
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.modal-close:hover {
+    color: var(--color-text-main);
+}
+
+/* Frailty slider */
+.frailty-slider {
+    background: linear-gradient(to right, #10B981, #FBBF24, #EF4444);
+}
+
+/* File drop area */
+.file-drop-area {
+    transition: all 0.2s ease;
+}
+
+.file-drop-area.active {
+    background-color: rgba(76, 110, 245, 0.05);
+    border-color: var(--color-primary);
+}
+
+/* Quick medication buttons */
+.quick-med-btn {
+    background-color: #EEF2FF;
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.quick-med-btn:hover {
+    background-color: #DBEAFE;
+}
+
+/* High contrast mode */
+body.high-contrast {
+    --color-background: #000000;
+    --color-text-main: #FFFFFF;
+    --color-text-subtle: #CCCCCC;
+    --color-border: #444444;
+    color: #FFFFFF;
+}
+
+body.high-contrast .form-panel,
+body.high-contrast .report-panel,
+body.high-contrast .modal-content,
+body.high-contrast .checkbox-card,
+body.high-contrast .input-field {
+    background-color: #222222;
+    border-color: #444444;
+    color: #FFFFFF;
+}
+
+body.high-contrast .checkbox-card:hover {
+    background-color: #333333;
+}
+
+body.high-contrast .report-output {
+    background-color: #333333;
+}
+
+body.high-contrast .input-field {
+    color: #FFFFFF;
+    background-color: #333333;
+}
+
+body.high-contrast .input-field:disabled,
+body.high-contrast .input-field[readonly] {
+    background-color: #444444;
+}
+
+/* Estilos para impresión */
+@media print {
+    body {
+        background-color: white;
+    }
+    
+    .main-grid {
+        display: block;
+    }
+    
+    .form-panel {
+        display: none;
+    }
+    
+    .report-panel {
+        display: block;
+        width: 100%;
+        box-shadow: none;
+        border: none;
+        padding: 0;
+        background-color: white;
+    }
+    
+    #risk-assessment-panel,
+    #goals-preview-panel {
+        break-inside: avoid;
+    }
+    
+    #report-output {
+        font-size: 12pt;
+    }
+    
+    #report-output h3 {
+        font-size: 14pt;
+        margin-top: 20px;
+    }
+    
+    #print-report-btn,
+    #copy-report-btn {
+        display: none;
+    }
+}
+
+.report-panel {
+    background-color: var(--color-background);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Elementos de formulario */
+.input-field {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background-color: white;
+    font-size: 0.875rem;
+    transition: border-color 0.2s;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.1);
+}
+
+.checkbox-card {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.checkbox-card:hover {
+    background-color: #F9FAFB;
+}
+
+.checkbox-card input[type="checkbox"]:checked + .content,
+.checkbox-card input[type="checkbox"]:checked + div.content {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+/* Botones y acciones */
+.quick-med-btn {
+    background-color: #EEF2FF;
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-med-btn:hover {
+    background-color: #E0E7FF;
+}
+
+/* Animación para carga */
+.loader {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--color-primary);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modales */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.modal-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Tooltips */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background-color: #333;
+    color: white;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.75rem;
+    pointer-events: none;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Indicador de fragilidad */
+.frailty-slider {
+    background: linear-gradient(to right, #10B981, #F59E0B, #EF4444);
+}
+
+/* Área de carga de archivos */
+.file-drop-area {
+    border: 2px dashed var(--color-border);
+    transition: all 0.3s;
+}
+
+.file-drop-area.active {
+    border-color: var(--color-primary);
+    background-color: rgba(76, 110, 245, 0.05);
+}
+
+/* Estilo para el riesgo */
+.risk-low {
+    background-color: var(--color-risk-low);
+}
+
+.risk-moderate {
+    background-color: var(--color-risk-moderate);
+}
+
+.risk-high {
+    background-color: var(--color-risk-high);
+}
+
+.risk-very-high {
+    background-color: var(--color-risk-very-high);
+}
+
+/* Notificaciones de errores en validación */
+input:invalid:focus, 
+select:invalid:focus {
+    border-color: #EF4444;
+}
+
+.error-message {
+    color: #EF4444;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* Modo alto contraste */
+.high-contrast {
+    --color-primary: #0066CC;
+    --color-primary-light: #0077EE;
+    --color-text-main: #000000;
+    --color-text-subtle: #444444;
+    --color-border: #000000;
+    --color-background: #FFFFFF;
+    --color-risk-low: #006633;
+    --color-risk-moderate: #CC6600;
+    --color-risk-high: #CC0000;
+    --color-risk-very-high: #660000;
+}
+
+.high-contrast .input-field {
+    border-width: 2px;
+}
+
+.high-contrast .checkbox-card {
+    border-width: 2px;
+}
+. i n p u t - g r o u p   {  
+         p o s i t i o n :   r e l a t i v e ;  
+ }  
+  
+ . c l e a r - v a l u e - b t n   {  
+         p o s i t i o n :   a b s o l u t e ;  
+         r i g h t :   0 ;  
+         t o p :   0 ;  
+         z - i n d e x :   5 ;  
+         f o n t - s i z e :   0 . 7 r e m ;  
+         p a d d i n g :   0 . 1 5 r e m   0 . 3 r e m ;  
+         m a r g i n :   3 p x ;  
+         b o r d e r - r a d i u s :   4 p x ;  
+ }  
+  
+ . c u s t o m - s e l e c t   {  
+         p a d d i n g - r i g h t :   3 0 p x   ! i m p o r t a n t ;  
+ }  
+ .input-group { position: relative; } .clear-value-btn { position: absolute; right: 0; top: 0; z-index: 5; font-size: 0.7rem; padding: 0.15rem 0.3rem; margin: 3px; border-radius: 4px; } .custom-select { padding-right: 30px !important; }

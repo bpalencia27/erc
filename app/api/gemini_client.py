@@ -1,392 +1,238 @@
-﻿"""
-Cliente para interactuar con la API de Google Gemini
 """
-import os
+Cliente mejorado para Google Gemini API
+Implementa mejores prácticas de prompt engineering y manejo de errores
+"""
+import google.generativeai as genai
+from typing import Dict, List, Optional, Any
+import structlog
+import asyncio
 import json
-import logging
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from tenacity import retry, stop_after_attempt, wait_exponential
+from pydantic import BaseModel, Field
+import os
 
-# En una implementación real, importaríamos google.generativeai
-# Este es un ejemplo simplificado para ilustrar la estructura
+logger = structlog.get_logger()
+
+class MedicalReport(BaseModel):
+    """Modelo para validar informes médicos generados"""
+    patient_id: str
+    summary: str
+    risk_assessment: str
+    recommendations: List[str]
+    lab_interpretation: Dict[str, Any]
+    follow_up: str
+    generated_at: str
 
 class GeminiClient:
-    """Cliente para interactuar con la API de Google Gemini."""
+    """Cliente avanzado para Google Gemini API con mejores prácticas 2025"""
     
-    def __init__(self):
-        """Inicializa el cliente con la API key y configura el modelo."""
-        self.api_key = os.environ.get('GOOGLE_AI_API_KEY')
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         if not self.api_key:
-            logging.warning("API key de Google Gemini no configurada, usando modo simulado")
+            raise ValueError("API key de Gemini no configurada")
         
-        # En una implementación real, configuramos el cliente de Gemini aquí
-        self.use_simulation = not self.api_key
+        genai.configure(api_key=self.api_key)
+        
+        # Configurar modelo con parámetros optimizados
+        self.generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "top_k": 40,
+            "max_output_tokens": 8192,
+        }
+        
+        self.safety_settings = [
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_ONLY_HIGH"
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_ONLY_HIGH"
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_ONLY_HIGH"
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_ONLY_HIGH"
+            },
+        ]
+        
+        self.model = genai.GenerativeModel(
+            model_name="gemini-1.5-pro",
+            generation_config=self.generation_config,
+            safety_settings=self.safety_settings
+        )
     
-    def generate_report(self, patient_data: Dict[str, Any], base_report: str) -> str:
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def generate_medical_report(self, patient_data: Dict) -> MedicalReport:
         """
-        Genera un informe médico utilizando la API de Gemini.
-        
-        Args:
-            patient_data: Datos del paciente en formato diccionario
-            base_report: Informe base generado por la lógica convencional
-            
-        Returns:
-            Informe HTML enriquecido por la IA
+        Genera un informe médico usando Chain-of-Thought prompting
         """
-        if self.use_simulation:
-            return self._generate_simulated_report(patient_data, base_report)
+        # Prompt mejorado con técnicas de 2025
+        prompt = self._create_medical_prompt(patient_data)
         
         try:
-            # Aquí iría la integración real con Gemini API
-            # Ejemplo:
-            # response = genai.generate_content(
-            #    prompt=self._create_prompt(patient_data, base_report)
-            # )
-            # return self._format_response(response)
+            # Generar respuesta
+            response = await self._async_generate(prompt)
             
-            # Por ahora, usamos la simulación
-            return self._generate_simulated_report(patient_data, base_report)
+            # Parsear y validar respuesta
+            report_data = self._parse_response(response.text)
+            
+            # Validar con Pydantic
+            report = MedicalReport(**report_data)
+            
+            logger.info("Informe médico generado exitosamente",
+                       patient_id=patient_data.get('id'))
+            
+            return report
             
         except Exception as e:
-            logging.error(f"Error al generar informe con Gemini: {str(e)}")
-            # Si falla la API, devolvemos el informe base
-            return base_report
+            logger.error("Error generando informe médico",
+                        error=str(e),
+                        patient_id=patient_data.get('id'))
+            raise
     
-    def _create_prompt(self, patient_data: Dict[str, Any], base_report: str) -> str:
+    def _create_medical_prompt(self, patient_data: Dict) -> str:
         """
-        Crea el prompt para la API de Gemini.
+        Crea un prompt optimizado usando mejores prácticas de prompt engineering
+        """
+        # Few-shot examples para mejorar la calidad
+        few_shot_examples = """
+        Ejemplo de análisis:
+        Paciente: Hombre, 65 años
+        Creatinina: 2.1 mg/dL (elevada)
+        TFG: 35 mL/min/1.73m² (reducida)
+        Diagnóstico: ERC estadio 3b
+        Riesgo CV: Alto (diabetes + hipertensión)
+        Recomendaciones: Control trimestral, ajuste medicación, dieta renal
+        """
         
-        Args:
-            patient_data: Datos del paciente
-            base_report: Informe base
-            
-        Returns:
-            Prompt formateado para la API
-        """
-        return f"""
-        Eres un especialista en nefrología generando un informe médico.
+        # Chain-of-thought prompting
+        prompt = f"""
+        Actúa como un nefrólogo experto analizando datos de un paciente con enfermedad renal crónica.
+        
+        {few_shot_examples}
+        
+        Analiza paso a paso los siguientes datos del paciente:
         
         DATOS DEL PACIENTE:
         {json.dumps(patient_data, indent=2, ensure_ascii=False)}
         
-        INFORME BASE:
-        {base_report}
+        INSTRUCCIONES - Realiza el análisis siguiendo estos pasos:
         
-        Amplía este informe con un análisis médico detallado sobre la enfermedad renal.
-        Incluye interpretación de valores de laboratorio, posibles complicaciones,
-        y recomendaciones de tratamiento basadas en las guías KDIGO.
-        Formato el resultado en HTML con estilos profesionales.
+        1. EVALUACIÓN DE FUNCIÓN RENAL:
+           - Calcula y clasifica la TFG según CKD-EPI 2021
+           - Determina el estadio de ERC (G1-G5)
+           - Evalúa la albuminuria (A1-A3)
+        
+        2. ESTRATIFICACIÓN DE RIESGO CARDIOVASCULAR:
+           - Identifica factores de riesgo presentes
+           - Calcula el riesgo según guías ESC/ESH 2025
+           - Determina el nivel de riesgo (bajo/moderado/alto/muy alto)
+        
+        3. EVALUACIÓN DE COMORBILIDADES:
+           - Diabetes: control glucémico (HbA1c objetivo)
+           - Hipertensión: control de PA (objetivo según edad/fragilidad)
+           - Dislipidemia: objetivos LDL según riesgo CV
+           - Anemia: evaluar hemoglobina
+        
+        4. RECOMENDACIONES TERAPÉUTICAS:
+           - Medicación: IECA/ARA2, estatinas, antidiabéticos
+           - Dieta: restricción proteica, sodio, potasio según estadio
+           - Estilo de vida: ejercicio, cesación tabáquica
+           - Vacunación: influenza, neumococo, COVID-19, hepatitis B
+        
+        5. PLAN DE SEGUIMIENTO:
+           - Frecuencia de controles según estadio
+           - Laboratorios a solicitar
+           - Interconsultas necesarias
+           - Criterios de derivación a nefrología/diálisis
+        
+        FORMATO DE RESPUESTA - Estructura tu respuesta como JSON:
+        {{
+            "patient_id": "identificador",
+            "summary": "resumen ejecutivo del caso",
+            "risk_assessment": "evaluación detallada del riesgo",
+            "recommendations": ["lista de recomendaciones específicas"],
+            "lab_interpretation": {{
+                "parametro": "interpretación y significado clínico"
+            }},
+            "follow_up": "plan de seguimiento detallado",
+            "generated_at": "timestamp ISO"
+        }}
+        
+        Sé preciso, basado en evidencia y considera las guías clínicas más recientes (2025).
         """
+        
+        return prompt
     
-    def _generate_simulated_report(self, patient_data: Dict[str, Any], base_report: str) -> str:
-        """
-        Genera un informe simulado cuando no hay API key disponible.
-        
-        Args:
-            patient_data: Datos del paciente
-            base_report: Informe base
-            
-        Returns:
-            Informe HTML simulado
-        """
-        nombre = patient_data.get('nombre', 'Paciente')
-        edad = patient_data.get('edad', 'N/A')
-        sexo = patient_data.get('sexo', 'N/A')
-        creatinina = patient_data.get('creatinina', 'N/A')
-        
-        # Simulamos un informe más elaborado
-        return f"""
-        <div class="ai-report">
-            <h1>Informe Médico: Evaluación Renal</h1>
-            <div class="patient-info">
-                <h2>Datos del Paciente</h2>
-                <p><strong>Nombre:</strong> {nombre}</p>
-                <p><strong>Edad:</strong> {edad} años</p>
-                <p><strong>Sexo:</strong> {sexo}</p>
-            </div>
-            
-            <div class="medical-evaluation">
-                <h2>Evaluación Médica</h2>
-                {base_report}
-                
-                <h3>Análisis Ampliado (Simulación)</h3>
-                <p>Este es un informe simulado generado localmente. En un entorno de producción, 
-                esta sección sería generada por la API de Google Gemini con un análisis más completo
-                y personalizado.</p>
-                
-                <p>La evaluación muestra que el paciente presenta valores de creatinina de {creatinina} mg/dL.
-                Es importante considerar una evaluación completa de la función renal que incluya también
-                proteinuria, análisis de sedimento urinario y estudios de imagen.</p>
-                
-                <div class="recommendations">
-                    <h3>Recomendaciones Generales</h3>
-                    <ul>
-                        <li>Control periódico de la función renal cada 3-6 meses</li>
-                        <li>Mantener una dieta baja en sodio y proteínas según sea apropiado</li>
-                        <li>Control estricto de presión arterial y glucemia</li>
-                        <li>Evitar medicamentos nefrotóxicos</li>
-                    </ul>
-                </div>
-            </div>
-            
-            <div class="footer">
-                <p>Informe generado el {datetime.now().strftime('%d/%m/%Y')} (versión simulada)</p>
-            </div>
-        </div>
-        """
-        
-    def process_advanced_evaluation(self, payload: Dict[str, Any]) -> str:
-        """
-        Procesa un payload estructurado y genera un informe médico avanzado.
-        
-        Args:
-            payload: Estructura de datos con información del paciente,
-                    laboratorios, diagnósticos, metas y plan de seguimiento
-                    
-        Returns:
-            Informe HTML avanzado estructurado
-        """
-        if self.use_simulation:
-            return self._generate_advanced_simulation(payload)
-            
+    async def _async_generate(self, prompt: str):
+        """Genera respuesta de forma asíncrona"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self.model.generate_content,
+            prompt
+        )
+    
+    def _parse_response(self, response_text: str) -> Dict:
+        """Parsea y limpia la respuesta de Gemini"""
         try:
-            # Aquí iría la integración real con Gemini API
-            # Ejemplo:
-            # response = genai.generate_content(
-            #    prompt=self._create_advanced_prompt(payload)
-            # )
-            # return self._format_response(response)
+            # Intentar extraer JSON de la respuesta
+            json_start = response_text.find('{')
+            json_end = response_text.rfind('}') + 1
             
-            # Por ahora, usamos la simulación
-            return self._generate_advanced_simulation(payload)
-            
+            if json_start != -1 and json_end != 0:
+                json_str = response_text[json_start:json_end]
+                return json.loads(json_str)
+            else:
+                # Si no hay JSON, estructurar la respuesta
+                return self._structure_text_response(response_text)
+                
+        except json.JSONDecodeError as e:
+            logger.error("Error parseando respuesta JSON", error=str(e))
+            return self._structure_text_response(response_text)
+    
+    def _structure_text_response(self, text: str) -> Dict:
+        """Estructura una respuesta de texto en el formato esperado"""
+        from datetime import datetime
+        
+        return {
+            "patient_id": "unknown",
+            "summary": text[:500] if len(text) > 500 else text,
+            "risk_assessment": "Evaluación pendiente de revisión manual",
+            "recommendations": text.split('\n')[:5],
+            "lab_interpretation": {"general": text},
+            "follow_up": "Seguimiento según criterio médico",
+            "generated_at": datetime.now().isoformat()
+        }
+    
+    async def analyze_lab_document(self, document_text: str) -> Dict:
+        """
+        Analiza un documento de laboratorio y extrae información estructurada
+        """
+        prompt = f"""
+        Analiza el siguiente documento de laboratorio y extrae la información en formato estructurado:
+        
+        DOCUMENTO:
+        {document_text}
+        
+        Extrae y estructura:
+        1. Datos del paciente (nombre, edad, sexo)
+        2. Fecha del estudio
+        3. Todos los parámetros de laboratorio con sus valores y unidades
+        4. Valores fuera de rango normal
+        5. Interpretación clínica básica
+        
+        Responde en formato JSON.
+        """
+        
+        try:
+            response = await self._async_generate(prompt)
+            return self._parse_response(response.text)
         except Exception as e:
-            logging.error(f"Error al generar informe avanzado con Gemini: {str(e)}")
-            # Si falla, devolvemos un informe de error
-            return f"""
-            <div class="error-report">
-                <h1>Error al generar el informe</h1>
-                <p>Se ha producido un error al procesar los datos del paciente.</p>
-                <p>Por favor, inténtelo de nuevo más tarde.</p>
-            </div>
-            """
-    
-    def _create_advanced_prompt(self, payload: Dict[str, Any]) -> str:
-        """
-        Crea un prompt avanzado para la API de Gemini.
-        
-        Args:
-            payload: Estructura de datos completa del paciente
-            
-        Returns:
-            Prompt formateado para la API
-        """
-        return f"""
-        Eres un especialista en nefrología generando un informe médico detallado.
-        
-        DATOS COMPLETOS:
-        {json.dumps(payload, indent=2, ensure_ascii=False)}
-        
-        Genera un informe médico completo y estructurado en HTML que incluya:
-        
-        1. Datos del paciente
-        2. Resultados de laboratorio relevantes
-        3. Evaluación de la función renal (TFG y estadio ERC)
-        4. Evaluación del riesgo cardiovascular
-        5. Análisis de comorbilidades
-        6. Metas terapéuticas (indicando si se cumplen o no)
-        7. Plan de seguimiento recomendado
-        8. Recomendaciones específicas según la condición del paciente
-        
-        Utiliza las guías KDIGO más recientes y asegúrate de que el informe sea
-        claro, preciso y profesional. Formatea el resultado en HTML con estilos
-        que faciliten la lectura y comprensión.
-        """
-    
-    def _generate_advanced_simulation(self, payload: Dict[str, Any]) -> str:
-        """
-        Genera un informe avanzado simulado basado en el payload completo.
-        
-        Args:
-            payload: Estructura de datos completa del paciente
-            
-        Returns:
-            Informe HTML simulado avanzado
-        """
-        # Extraer datos del paciente
-        paciente = payload.get("paciente", {})
-        nombre = paciente.get("nombre", "Paciente sin nombre")
-        edad = paciente.get("edad", "N/A")
-        sexo = paciente.get("sexo", "N/A")
-        peso = paciente.get("peso", "N/A")
-        talla = paciente.get("talla", "N/A")
-        imc = paciente.get("imc", "N/A")
-        
-        # Extraer evaluación diagnóstica
-        diagnosticos = payload.get("evaluacion_diagnosticos", {})
-        tfg = diagnosticos.get("tfg_valor", "N/A")
-        etapa_erc = diagnosticos.get("erc_estadio", "No determinada")
-        riesgo_cv = diagnosticos.get("riesgo_cardiovascular", "No determinado")
-        comorbilidades = diagnosticos.get("comorbilidades", [])
-        
-        # Extraer metas terapéuticas
-        metas = payload.get("metas_terapeuticas", [])
-        
-        # Extraer plan de seguimiento
-        seguimiento = payload.get("plan_seguimiento", {})
-        fecha_labs = seguimiento.get("laboratorios", "No especificada")
-        fecha_consulta = seguimiento.get("consulta_control", "No especificada")
-        
-        # Generar informe HTML simulado
-        return f"""
-        <div class="advanced-report">
-            <header class="report-header">
-                <h1>Informe Médico Avanzado: Evaluación ERC</h1>
-                <p class="report-date">Fecha: {datetime.now().strftime('%d/%m/%Y')}</p>
-            </header>
-            
-            <section class="patient-section">
-                <h2>Datos del Paciente</h2>
-                <div class="patient-data">
-                    <p><strong>Nombre:</strong> {nombre}</p>
-                    <p><strong>Edad:</strong> {edad} años</p>
-                    <p><strong>Sexo:</strong> {sexo}</p>
-                    <p><strong>Peso:</strong> {peso} kg</p>
-                    <p><strong>Talla:</strong> {talla} cm</p>
-                    <p><strong>IMC:</strong> {imc} kg/m {" (Obesidad)" if isinstance(imc, (int, float)) and imc >= 30 else ""}</p>
-                </div>
-            </section>
-            
-            <section class="evaluation-section">
-                <h2>Evaluación Renal</h2>
-                <div class="evaluation-data">
-                    <p><strong>Tasa de Filtración Glomerular (TFG):</strong> {tfg} ml/min/1.73m</p>
-                    <p><strong>Clasificación ERC:</strong> <span class="highlight">{etapa_erc.upper() if isinstance(etapa_erc, str) else etapa_erc}</span></p>
-                    <p><strong>Riesgo Cardiovascular:</strong> <span class="highlight">{riesgo_cv.replace('_', ' ').title() if isinstance(riesgo_cv, str) else riesgo_cv}</span></p>
-                </div>
-                
-                <div class="comorbidities">
-                    <h3>Comorbilidades</h3>
-                    <ul>
-                        {'' if not comorbilidades else ''.join([f'<li>{c}</li>' for c in comorbilidades])}
-                        {'' if comorbilidades else '<li>No se registran comorbilidades</li>'}
-                    </ul>
-                </div>
-            </section>
-            
-            <section class="goals-section">
-                <h2>Metas Terapéuticas</h2>
-                <table class="goals-table">
-                    <thead>
-                        <tr>
-                            <th>Parámetro</th>
-                            <th>Valor Actual</th>
-                            <th>Meta</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {'' if not metas else ''.join([f'''
-                        <tr>
-                            <td>{meta.get('parametro', '')}</td>
-                            <td>{meta.get('valor_actual', '')}</td>
-                            <td>{meta.get('meta', '')}</td>
-                            <td class="{'goal-met' if meta.get('cumple', False) else 'goal-pending'}">
-                                {(' Cumple' if meta.get('cumple', False) else ' No Cumple')}
-                            </td>
-                        </tr>
-                        ''' for meta in metas])}
-                        {'' if metas else '<tr><td colspan="4">No se han definido metas terapéuticas</td></tr>'}
-                    </tbody>
-                </table>
-            </section>
-            
-            <section class="follow-up-section">
-                <h2>Plan de Seguimiento</h2>
-                <div class="follow-up-data">
-                    <p><strong>Próximos Laboratorios:</strong> {fecha_labs}</p>
-                    <p><strong>Próxima Consulta:</strong> {fecha_consulta}</p>
-                </div>
-                
-                <div class="recommendations">
-                    <h3>Recomendaciones Generales</h3>
-                    <ul>
-                        <li>Control periódico de la función renal según el plan establecido</li>
-                        <li>Mantener una dieta baja en sodio {'' if tfg and tfg < 60 else 'si es necesario'}</li>
-                        <li>Control estricto de presión arterial {f'(meta: {metas[0]["meta"]} mmHg)' if metas and metas[0].get('parametro') == 'Presión Arterial' else ''}</li>
-                        <li>Evitar medicamentos nefrotóxicos (AINEs, aminoglucósidos)</li>
-                        {'<li>Control glicémico estricto</li>' if 'Diabetes Mellitus' in comorbilidades else ''}
-                    </ul>
-                </div>
-            </section>
-            
-            <footer class="report-footer">
-                <p>Informe generado el {datetime.now().strftime('%d/%m/%Y')} (versión simulada)</p>
-                <p class="note">Este informe es generado automáticamente y debe ser validado por un profesional médico.</p>
-            </footer>
-            
-            <style>
-                .advanced-report {
-                    font-family: Arial, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    max-width: 800px;
-                    margin: 0 auto;
-                    padding: 20px;
-                }
-                .report-header {
-                    text-align: center;
-                    margin-bottom: 30px;
-                    border-bottom: 2px solid #3498db;
-                    padding-bottom: 10px;
-                }
-                section {
-                    margin-bottom: 25px;
-                    padding: 15px;
-                    background: #f9f9f9;
-                    border-radius: 5px;
-                }
-                h2 {
-                    color: #2980b9;
-                    border-bottom: 1px solid #ddd;
-                    padding-bottom: 8px;
-                }
-                .highlight {
-                    font-weight: bold;
-                    color: #e74c3c;
-                }
-                .goals-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .goals-table th, .goals-table td {
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                    text-align: left;
-                }
-                .goals-table th {
-                    background-color: #f2f2f2;
-                }
-                .goal-met {
-                    color: green;
-                    font-weight: bold;
-                }
-                .goal-pending {
-                    color: red;
-                }
-                ul {
-                    padding-left: 20px;
-                }
-                .report-footer {
-                    margin-top: 30px;
-                    border-top: 1px solid #ddd;
-                    padding-top: 10px;
-                    font-size: 0.9em;
-                    color: #777;
-                }
-                .note {
-                    font-style: italic;
-                }
-            </style>
-        </div>
-        """
+            logger.error("Error analizando documento", error=str(e))
+            raise

@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Evaluación Clínica Integral - ERC Insight Pro
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto py-8 px-4">
+    <div class="flex flex-col lg:flex-row gap-8">
+        <!-- Panel izquierdo: Formulario y Uploader -->
+        <div class="w-full lg:w-1/2 space-y-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6 text-gray-900">Carga de Documentos</h2>
+                <div id="file-uploader" class="mb-4"></div>
+                <div id="data-preview" class="mt-4"></div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6 text-gray-900">Datos del Paciente</h2>
+                <form id="patient-form" class="space-y-6">
+                    <!-- Datos Demográficos -->
+                    <fieldset>
+                        <legend class="text-lg font-semibold text-gray-800 mb-3">Datos Demográficos</legend>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="nombre" class="block text-sm font-medium text-gray-700">Nombre Completo</label>
+                                <input type="text" id="nombre" name="nombre" class="input-field mt-1" required>
+                            </div>
+                            <div>
+                                <label for="edad" class="block text-sm font-medium text-gray-700">Edad (años)</label>
+                                <input type="number" id="edad" name="edad" class="input-field mt-1" required min="1">
+                            </div>
+                            <div>
+                                <label for="sexo" class="block text-sm font-medium text-gray-700">Sexo Biológico</label>
+                                <select id="sexo" name="sexo" class="input-field mt-1" required>
+                                    <option value="">Seleccionar</option>
+                                    <option value="m">Masculino</option>
+                                    <option value="f">Femenino</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="peso" class="block text-sm font-medium text-gray-700">Peso (kg)</label>
+                                <input type="number" id="peso" name="peso" step="0.1" class="input-field mt-1" required>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!-- Factores de Riesgo -->
+                    <fieldset>
+                        <legend class="text-lg font-semibold text-gray-800 mb-3">Factores de Riesgo</legend>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="checkbox-card">
+                                <input type="checkbox" id="hta" name="hta" class="h-5 w-5 rounded">
+                                <span class="ml-3 content text-gray-700">Hipertensión Arterial (HTA)</span>
+                            </label>
+                            <label class="checkbox-card">
+                                <input type="checkbox" id="dm2" name="dm2" class="h-5 w-5 rounded">
+                                <span class="ml-3 content text-gray-700">Diabetes Mellitus 2 (DM2)</span>
+                            </label>
+                            <label class="checkbox-card">
+                                <input type="checkbox" id="tabaquismo" name="tabaquismo" class="h-5 w-5 rounded">
+                                <span class="ml-3 content text-gray-700">Tabaquismo</span>
+                            </label>
+                            <label class="checkbox-card">
+                                <input type="checkbox" id="dislipidemia" name="dislipidemia" class="h-5 w-5 rounded">
+                                <span class="ml-3 content text-gray-700">Dislipidemia</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <!-- Laboratorios -->
+                    <fieldset>
+                        <legend class="text-lg font-semibold text-gray-800 mb-3">Valores de Laboratorio</legend>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="creatinina" class="block text-sm font-medium text-gray-700">Creatinina (mg/dL)</label>
+                                <input type="number" id="creatinina" name="creatinina" step="0.01" class="input-field mt-1">
+                            </div>
+                            <div>
+                                <label for="colesterol_ldl" class="block text-sm font-medium text-gray-700">Colesterol LDL (mg/dL)</label>
+                                <input type="number" id="colesterol_ldl" name="colesterol_ldl" class="input-field mt-1">
+                            </div>
+                            <div>
+                                <label for="hdl" class="block text-sm font-medium text-gray-700">Colesterol HDL (mg/dL)</label>
+                                <input type="number" id="hdl" name="hdl" class="input-field mt-1">
+                            </div>
+                            <div>
+                                <label for="trigliceridos" class="block text-sm font-medium text-gray-700">Triglicéridos (mg/dL)</label>
+                                <input type="number" id="trigliceridos" name="trigliceridos" class="input-field mt-1">
+                            </div>
+                            <div>
+                                <label for="pa_sistolica" class="block text-sm font-medium text-gray-700">PA Sistólica (mmHg)</label>
+                                <input type="number" id="pa_sistolica" name="pa_sistolica" class="input-field mt-1">
+                            </div>
+                            <div>
+                                <label for="pa_diastolica" class="block text-sm font-medium text-gray-700">PA Diastólica (mmHg)</label>
+                                <input type="number" id="pa_diastolica" name="pa_diastolica" class="input-field mt-1">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <div class="pt-4">
+                        <button type="button" id="evaluar-btn" class="w-full bg-primary hover:bg-primary-light text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300">
+                            Evaluar Paciente
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Panel derecho: Resultados -->
+        <div class="w-full lg:w-1/2 space-y-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6 text-gray-900">Clasificación de Riesgo</h2>
+                <div id="risk-classification-display"></div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6 text-gray-900">Metas Terapéuticas</h2>
+                <div id="therapeutic-goals-display">
+                    <div class="text-gray-500 italic">
+                        Complete los datos del paciente y presione "Evaluar Paciente" para ver las metas terapéuticas.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/api-bridge.js') }}"></script>
+<script src="{{ url_for('static', filename='js/file-uploader.js') }}"></script>
+<script src="{{ url_for('static', filename='js/real-time-risk-classifier.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar componentes (aunque ya se hacen internamente)
+        const fileUploader = new FileUploader('file-uploader', 'data-preview');
+        const riskClassifier = new RealTimeRiskClassifier('#patient-form', '#risk-classification-display');
+        
+        // Botón de evaluación manual
+        document.getElementById('evaluar-btn').addEventListener('click', async function() {
+            try {
+                const form = document.getElementById('patient-form');
+                const formData = new FormData(form);
+                const data = {};
+                
+                // Convertir FormData a objeto
+                for (let [key, value] of formData.entries()) {
+                    data[key] = value;
+                }
+                
+                // Evaluar metas terapéuticas
+                const goals = await apiRulesBridge.evaluateTherapeuticGoals(data);
+                updateTherapeuticGoalsDisplay(goals);
+            } catch (error) {
+                console.error('Error al evaluar paciente:', error);
+                modalManager.showNotification('Error al evaluar paciente: ' + error.message, 'error');
+            }
+        });
+        
+        // Función para actualizar visualización de metas terapéuticas
+        function updateTherapeuticGoalsDisplay(goals) {
+            const display = document.getElementById('therapeutic-goals-display');
+            
+            if (!display || !goals.success) {
+                display.innerHTML = '<div class="text-red-500">Error al obtener metas terapéuticas</div>';
+                return;
+            }
+            
+            let html = '<div class="space-y-6">';
+            
+            // LDL
+            if (goals.goals.ldl) {
+                const ldlStatus = goals.status.ldl || 'no evaluado';
+                const statusColor = getStatusColor(ldlStatus);
+                
+                html += `
+                <div class="goal-card">
+                    <h3 class="text-lg font-semibold">Colesterol LDL</h3>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p>Meta óptima: <strong>${goals.goals.ldl.optimal} ${goals.goals.ldl.unit}</strong></p>
+                            ${goals.goals.ldl.min ? `<p>Meta mínima: <strong>${goals.goals.ldl.min} ${goals.goals.ldl.unit}</strong></p>` : ''}
+                        </div>
+                        <div class="status-pill" style="background-color: ${statusColor}">
+                            ${capitalizeFirstLetter(ldlStatus)}
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            // Presión arterial
+            if (goals.goals.bp) {
+                const bpStatus = goals.status.bp || 'no evaluado';
+                const statusColor = getStatusColor(bpStatus);
+                
+                html += `
+                <div class="goal-card">
+                    <h3 class="text-lg font-semibold">Presión Arterial</h3>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p>Meta óptima: <strong>${goals.goals.bp.systolic.optimal}/${goals.goals.bp.diastolic.optimal} ${goals.goals.bp.unit}</strong></p>
+                        </div>
+                        <div class="status-pill" style="background-color: ${statusColor}">
+                            ${capitalizeFirstLetter(bpStatus)}
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            // HbA1c
+            if (goals.goals.hba1c) {
+                const hba1cStatus = goals.status.hba1c || 'no evaluado';
+                const statusColor = getStatusColor(hba1cStatus);
+                
+                html += `
+                <div class="goal-card">
+                    <h3 class="text-lg font-semibold">HbA1c</h3>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p>Meta óptima: <strong>${goals.goals.hba1c.optimal} ${goals.goals.hba1c.unit}</strong></p>
+                        </div>
+                        <div class="status-pill" style="background-color: ${statusColor}">
+                            ${capitalizeFirstLetter(hba1cStatus)}
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            html += '</div>';
+            
+            display.innerHTML = html;
+        }
+        
+        function getStatusColor(status) {
+            const colors = {
+                'sobresaliente': '#4caf50',
+                'satisfactorio': '#8bc34a',
+                'no cumple': '#f44336',
+                'no evaluado': '#9e9e9e'
+            };
+            
+            return colors[status.toLowerCase()] || '#9e9e9e';
+        }
+        
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+    });
+</script>
+
+<style>
+    .goal-card {
+        border: 1px solid #eee;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .status-pill {
+        color: white;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-weight: bold;
+        font-size: 0.875rem;
+    }
+    
+    .input-field {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+    }
+    
+    .checkbox-card {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        border: 1px solid #e5e7eb;
+    }
+</style>
+{% endblock %}

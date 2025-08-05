@@ -1,13 +1,15 @@
 ﻿from flask import (
-    Blueprint, render_template, request, 
+    Blueprint,
+    render_template, request,
     current_app, jsonify, flash, redirect, url_for
 )
+bp = Blueprint('upload', __name__)
 import os
 from werkzeug.utils import secure_filename
+from . import bp
 from app.parsers.pdf_extractor import extract_data_from_pdf
 from app.parsers.txt_extractor import extract_data_from_txt
 from app.parsers.lab_parser import parse_lab_results
-from . import bp
 
 ALLOWED_EXTENSIONS = {'pdf', 'txt'}
 
@@ -21,15 +23,14 @@ def upload_form():
 
 @bp.route('/process', methods=['POST'])
 def process_document():
-    # Verificar si hay archivo en la solicitud
     if 'file' not in request.files:
-        flash('No se encontró ningún archivo', 'error')
+        flash('No se encontrÃ³ ningÃºn archivo', 'error')
         return redirect(url_for('upload.upload_form'))
 
     file = request.files['file']
 
     if file.filename == '':
-        flash('No se seleccionó ningún archivo', 'error')
+        flash('No se seleccionÃ³ ningÃºn archivo', 'error')
         return redirect(url_for('upload.upload_form'))
 
     if file and allowed_file(file.filename):
@@ -55,4 +56,3 @@ def process_document():
 
     flash('Tipo de archivo no permitido', 'error')
     return redirect(url_for('upload.upload_form'))
-
