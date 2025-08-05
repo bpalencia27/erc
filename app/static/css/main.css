@@ -1,0 +1,138 @@
+/* 
+ * ERC Insight - Estilos principales
+ */
+
+:root {
+    --bg-main: #f8fafc;
+    --bg-panel: #ffffff;
+    --bg-panel-alt: #f1f5f9;
+    --primary: #364FC7;
+    --primary-light: #4C6EF5;
+    --text-main: #1e293b;
+    --text-subtle: #475569;
+    --border-color: #e2e8f0;
+    --risk-low: #22c55e;
+    --risk-moderate: #f59e0b;
+    --risk-high: #ef4444;
+    --risk-very-high: #b91c1c;
+}
+
+body {
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.footer {
+    margin-top: auto;
+}
+
+/* Estilos para la página principal */
+.jumbotron {
+    background-color: #f8f9fa;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Estilos para tarjetas */
+.card {
+    transition: transform 0.3s;
+    border: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+/* Estilos para formularios */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+/* Estilos para visualización de informes */
+.report-container {
+    background-color: #fff;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.report-header {
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+}
+
+.report-section {
+    margin-bottom: 2rem;
+}
+
+.report-section h3 {
+    color: #007bff;
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+}
+
+/* Estilos para carga de archivos */
+.upload-area {
+    border: 2px dashed #ccc;
+    border-radius: 5px;
+    padding: 3rem;
+    text-align: center;
+    background-color: #f8f9fa;
+    transition: all 0.3s;
+}
+
+.upload-area:hover {
+    border-color: #007bff;
+    background-color: #f1f8ff;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+/* Estilos para resultados de laboratorio */
+.lab-results {
+    background-color: #f8f9fa;
+    border-left: 4px solid #28a745;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.lab-item {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid #eee;
+    padding: 0.5rem 0;
+}
+
+.lab-name {
+    font-weight: bold;
+}
+
+.lab-value {
+    font-family: monospace;
+}
+
+/* Indicadores de estado */
+.status-normal {
+    color: #28a745;
+}
+
+.status-warning {
+    color: #ffc107;
+}
+
+.status-danger {
+    color: #dc3545;
+}

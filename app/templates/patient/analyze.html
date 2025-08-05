@@ -1,0 +1,360 @@
+{% extends "nueva_base.html" %}
+
+{% block styles %}
+<style>
+    .main-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        min-height: 100vh;
+    }
+    @media (min-width: 1024px) {
+        .main-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    .form-panel {
+        padding: 2rem 2.5rem;
+        background-color: var(--bg-panel);
+        border-right: 1px solid var(--border-color);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .report-panel {
+        padding: 2rem 2.5rem;
+        background-color: var(--bg-panel-alt);
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+    }
+    .input-field {
+        width: 100%;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-color);
+        padding: 0.75rem 1rem;
+        transition: all 0.2s ease;
+    }
+    .input-field:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(54, 79, 199, 0.2);
+    }
+    /* Más estilos del template original... */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-grid">
+    <main class="form-panel">
+        <header class="mb-6 flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Análisis de Paciente</h1>
+            <div class="flex space-x-2">
+                <button id="open-history-btn" class="text-primary hover:text-primary-light" title="Historial de pacientes">
+                    <i class="fas fa-history"></i>
+                </button>
+                <button id="high-contrast-toggle" class="text-primary hover:text-primary-light" title="Alto contraste">
+                    <i class="fas fa-adjust"></i>
+                </button>
+            </div>
+        </header>
+
+        <form id="clinical-form" class="space-y-6 flex-grow overflow-y-auto pr-4 -mr-4" method="POST" action="{{ url_for('patient.analyze') }}">
+            {{ form.csrf_token }}
+            
+            <!-- Datos básicos del paciente -->
+            <div class="bg-white p-5 rounded-xl shadow-sm">
+                <h2 class="text-lg font-semibold mb-4">Datos del Paciente</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="document_type" class="block text-sm font-medium text-text-subtle mb-1">Tipo Documento</label>
+                        <select id="document_type" name="document_type" class="input-field">
+                            <option value="cc">Cédula de Ciudadanía</option>
+                            <option value="ce">Cédula de Extranjería</option>
+                            <option value="pasaporte">Pasaporte</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="document_number" class="block text-sm font-medium text-text-subtle mb-1">Número Documento</label>
+                        <input type="text" id="document_number" name="document_number" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="first_name" class="block text-sm font-medium text-text-subtle mb-1">Nombres</label>
+                        <input type="text" id="first_name" name="first_name" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="last_name" class="block text-sm font-medium text-text-subtle mb-1">Apellidos</label>
+                        <input type="text" id="last_name" name="last_name" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="gender" class="block text-sm font-medium text-text-subtle mb-1">Sexo</label>
+                        <select id="gender" name="gender" class="input-field">
+                            <option value="m">Masculino</option>
+                            <option value="f">Femenino</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="date_of_birth" class="block text-sm font-medium text-text-subtle mb-1">Fecha de Nacimiento</label>
+                        <input type="date" id="date_of_birth" name="date_of_birth" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="ethnicity" class="block text-sm font-medium text-text-subtle mb-1">Etnia</label>
+                        <select id="ethnicity" name="ethnicity" class="input-field">
+                            <option value="no_negro">No Negro</option>
+                            <option value="negro">Negro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edad" class="block text-sm font-medium text-text-subtle mb-1">Edad (Años)</label>
+                        <input type="number" id="edad" name="edad" class="input-field" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Datos clínicos -->
+            <div class="bg-white p-5 rounded-xl shadow-sm">
+                <h2 class="text-lg font-semibold mb-4">Datos Clínicos</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="peso" class="block text-sm font-medium text-text-subtle mb-1">Peso (kg)</label>
+                        <input type="number" id="peso" name="peso" step="0.1" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="talla" class="block text-sm font-medium text-text-subtle mb-1">Talla (cm)</label>
+                        <input type="number" id="talla" name="talla" step="0.1" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="imc" class="block text-sm font-medium text-text-subtle mb-1">IMC</label>
+                        <input type="text" id="imc" name="imc" class="input-field" readonly>
+                    </div>
+                </div>
+                
+                <!-- Presión arterial -->
+                <div class="mt-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-sm font-medium text-text-subtle">Presión Arterial</label>
+                        <button type="button" id="add-pa-btn" class="text-xs bg-primary hover:bg-primary-light text-white font-medium py-1 px-2 rounded-full">
+                            <i class="fas fa-plus mr-1"></i> Añadir
+                        </button>
+                    </div>
+                    <div id="pa-container"></div>
+                </div>
+            </div>
+
+            <!-- Datos médicos adicionales... -->
+            <!-- Resto de formulario con diagnósticos, medicamentos, etc. -->
+
+            <button type="submit" class="w-full bg-primary hover:bg-primary-light text-white font-bold py-3 px-4 rounded-lg shadow transition-all">
+                <i class="fas fa-file-medical mr-2"></i> Generar Informe
+            </button>
+        </form>
+    </main>
+
+    <aside class="report-panel">
+        <div id="risk-assessment-panel" class="p-5 rounded-xl mb-4 transition-all duration-500 bg-gray-200">
+            <h2 class="text-lg font-semibold mb-3">Evaluación de Riesgo</h2>
+            <div class="flex items-center mb-4">
+                <div id="risk-level-indicator" class="text-xs font-bold text-white py-1 px-3 rounded-full bg-gray-400">
+                    PENDIENTE
+                </div>
+                <div id="erc-alert-icon" class="hidden ml-3 bg-yellow-100 text-yellow-800 p-1 rounded-full">
+                    <i class="fas fa-kidney text-xs"></i>
+                </div>
+            </div>
+            <h3 class="text-sm font-medium mb-2">Factores de Riesgo:</h3>
+            <div id="risk-factors-summary" class="text-sm"></div>
+        </div>
+        
+        <div id="goals-preview-panel" class="p-5 rounded-xl mb-6 transition-all duration-500 bg-white shadow-sm">
+            <h2 class="text-lg font-semibold mb-3">Metas Terapéuticas</h2>
+            <div id="goals-preview-content"></div>
+        </div>
+        
+        <div id="report-container" class="h-full">
+            <div id="report-placeholder" class="p-8 rounded-xl bg-white shadow-sm text-center">
+                <img src="{{ url_for('static', filename='img/report-placeholder.svg') }}" alt="Informe" class="w-32 h-32 mx-auto mb-4 opacity-50">
+                <h3 class="text-lg font-medium mb-2">Informe Médico</h3>
+                <p class="text-sm text-text-subtle">Complete el formulario y haga clic en "Generar Informe" para crear un análisis detallado del paciente.</p>
+            </div>
+            
+            <div id="report-loader" class="p-8 rounded-xl bg-white shadow-sm text-center hidden">
+                <div class="loader mx-auto mb-4"></div>
+                <h3 class="text-lg font-medium mb-2">Generando Informe</h3>
+                <p class="text-sm text-text-subtle">Analizando datos y creando informe personalizado...</p>
+            </div>
+            
+            <div id="report-output-container" class="p-6 rounded-xl bg-white shadow-sm hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Informe Médico</h2>
+                    <div class="flex space-x-2">
+                        <button id="copy-report-btn" class="text-primary hover:text-primary-light" title="Copiar al portapapeles">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <button id="print-report-btn" class="text-primary hover:text-primary-light" title="Imprimir">
+                            <i class="fas fa-print"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="report-output" class="prose max-w-none"></div>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<!-- Modales (fragilidad, alertas, historial) -->
+<div id="fragility-modal" class="modal-backdrop">
+    <!-- Contenido del modal de fragilidad -->
+</div>
+
+<div id="alert-modal" class="modal-backdrop">
+    <!-- Contenido del modal de alertas -->
+</div>
+
+<div id="history-modal" class="modal-backdrop">
+    <!-- Contenido del modal de historial -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Referencias a elementos del DOM ---
+        const form = document.getElementById('clinical-form');
+        // Más referencias...
+        
+        // --- Configuración CSRF para AJAX ---
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        
+        // --- Estado de la aplicación ---
+        let patientData = {
+            laboratorios: []
+        };
+        let charts = {};
+        
+        // --- Funciones de Cálculo ---
+        const calculateTFG = (creatinina, edad, sexo, peso) => {
+            if (!creatinina || !edad || !sexo || !peso) return null;
+            const scr = parseFloat(creatinina);
+            const age = parseInt(edad);
+            const weight = parseFloat(peso);
+            
+            if (scr <= 0 || age <= 0 || weight <= 0) return null;
+            
+            const factorSexo = (sexo === 'f') ? 0.85 : 1.0;
+            const tfg = ((140 - age) * weight * factorSexo) / (72 * scr);
+            return Math.round(tfg);
+        };
+        
+        // Más funciones de cálculo...
+        
+        // --- Lógica de Clasificación de Riesgo y UI Dinámica ---
+        const updateAllCalculations = () => {
+            // Recopilar datos del formulario
+            const data = new FormData(form);
+            const formDataObject = Object.fromEntries(data.entries());
+            
+            // Fusionar datos del formulario con el estado actual
+            Object.assign(patientData, formDataObject);
+            
+            // Calcular TFG usando la lógica de tu backend
+            patientData.tfg = calculateTFG(patientData.creatinina, patientData.edad, patientData.sexo, patientData.peso);
+            document.getElementById('tfg-display').value = patientData.tfg ? `${patientData.tfg} mL/min` : '';
+            
+            // Actualizar panel de riesgo
+            updateRiskPanel();
+            // Actualizar preview de metas
+            updateGoalsPreview();
+        };
+        
+        // --- Lógica de Presión Arterial ---
+        const paContainer = document.getElementById('pa-container');
+        const addPaReading = () => {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-12 gap-2 items-center';
+            div.innerHTML = `
+                <button type="button" class="remove-pa-btn text-red-500 hover:text-red-700 col-span-1" aria-label="Eliminar medición"><i class="fas fa-trash"></i></button>
+                <div class="col-span-5">
+                    <input type="number" name="systolic" placeholder="Sistólica" class="input-field">
+                </div>
+                <div class="col-span-5">
+                    <input type="number" name="diastolic" placeholder="Diastólica" class="input-field">
+                </div>
+            `;
+            paContainer.appendChild(div);
+            div.querySelector('.remove-pa-btn').addEventListener('click', () => div.remove());
+        };
+        document.getElementById('add-pa-btn').addEventListener('click', addPaReading);
+        
+        // --- Generación de Informe ---
+        const generateReportWithAI = async (data) => {
+            document.getElementById('report-placeholder').classList.add('hidden');
+            document.getElementById('report-loader').classList.remove('hidden');
+            document.getElementById('report-output-container').classList.add('hidden');
+            
+            try {
+                // Enviar datos al backend de Flask en lugar de llamar a la API directamente
+                const response = await fetch('{{ url_for("api.generate_report") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                document.getElementById('report-output').innerHTML = result.html_report;
+            } catch (error) {
+                showAlert("Error de Generación", "No se pudo generar el informe. Intente de nuevo.");
+            } finally {
+                document.getElementById('report-loader').classList.add('hidden');
+                document.getElementById('report-output-container').classList.remove('hidden');
+            }
+        };
+        
+        // Manejo del formulario
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            updateAllCalculations();
+            generateReportWithAI(patientData);
+        });
+        
+        // --- Cálculo automático de edad a partir de fecha de nacimiento ---
+        document.getElementById('date_of_birth').addEventListener('change', function() {
+            const birthDate = new Date(this.value);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            document.getElementById('edad').value = age;
+        });
+        
+        // --- Cálculo de IMC ---
+        const calculateIMC = () => {
+            const peso = parseFloat(document.getElementById('peso').value);
+            const tallaCm = parseFloat(document.getElementById('talla').value);
+            const imcInput = document.getElementById('imc');
+            
+            if (peso && tallaCm > 0) {
+                const tallaM = tallaCm / 100;
+                const imc = (peso / (tallaM * tallaM)).toFixed(1);
+                imcInput.value = `${imc} kg/m²`;
+            } else {
+                imcInput.value = '';
+            }
+        };
+        document.getElementById('peso').addEventListener('input', calculateIMC);
+        document.getElementById('talla').addEventListener('input', calculateIMC);
+        
+        // --- Inicialización ---
+        addPaReading();
+        updateAllCalculations();
+    });
+</script>
+{% endblock %}

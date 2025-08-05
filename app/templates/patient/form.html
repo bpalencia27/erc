@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Registro de Paciente</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('patient.new') }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="nombre" class="form-label">Nombre completo</label>
+                            <input type="text" class="form-control" id="nombre" name="nombre" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="edad" class="form-label">Edad</label>
+                            <input type="number" class="form-control" id="edad" name="edad" min="1" max="120" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Sexo</label>
+                            <div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="sexo" id="sexo-m" value="m" checked>
+                                    <label class="form-check-label" for="sexo-m">Masculino</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="sexo" id="sexo-f" value="f">
+                                    <label class="form-check-label" for="sexo-f">Femenino</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="peso" class="form-label">Peso (kg)</label>
+                            <input type="number" class="form-control" id="peso" name="peso" min="1" step="0.1" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="talla" class="form-label">Talla (cm)</label>
+                            <input type="number" class="form-control" id="talla" name="talla" min="50" max="250">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="creatinina" class="form-label">Creatinina (mg/dL)</label>
+                            <input type="number" class="form-control" id="creatinina" name="creatinina" min="0.1" step="0.1" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="hta" name="hta">
+                                <label class="form-check-label" for="hta">Hipertensión Arterial</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="dm2" name="dm2">
+                                <label class="form-check-label" for="dm2">Diabetes Mellitus tipo 2</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="dislipidemia" name="dislipidemia">
+                                <label class="form-check-label" for="dislipidemia">Dislipidemia</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div id="tfg-container" class="alert alert-info d-none">
+                                <h5>Cálculo preliminar:</h5>
+                                <p>TFG: <strong id="tfg-result">--</strong> ml/min</p>
+                                <p>Etapa ERC: <strong id="erc-stage">--</strong></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="button" class="btn btn-secondary" onclick="calculateTFG()">Calcular TFG</button>
+                        <button type="submit" class="btn btn-primary">Guardar Paciente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Añadir event listeners para calcular TFG automáticamente cuando se completen los campos
+        const requiredFields = ['edad', 'peso', 'creatinina'];
+        requiredFields.forEach(field => {
+            document.getElementById(field).addEventListener('change', calculateTFG);
+        });
+        
+        // También calcular cuando cambie el sexo
+        document.querySelectorAll('input[name="sexo"]').forEach(radio => {
+            radio.addEventListener('change', calculateTFG);
+        });
+    });
+</script>
+{% endblock %}

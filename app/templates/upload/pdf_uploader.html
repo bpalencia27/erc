@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Cargar Documento</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('upload.process_document') }}" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Seleccione un archivo PDF o TXT con resultados de laboratorio</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".pdf,.txt" required>
+                            <div class="form-text">Formatos aceptados: PDF, TXT. Tamaño máximo: 16MB.</div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Cargar y Analizar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Mensajes flash -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} mt-3">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>
+{% endblock %}
