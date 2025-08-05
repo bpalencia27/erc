@@ -1,27 +1,60 @@
-# Requisitos para ERC Insight
-Flask==2.3.3
-flask-cors==4.0.0
-flask-sqlalchemy==3.1.1
-flask-migrate==4.0.5
-Werkzeug==2.3.7
-Jinja2==3.1.2
-itsdangerous==2.1.2
-python-dotenv==1.0.0
-requests==2.31.0
-SQLAlchemy==2.0.23
-PyPDF2==3.0.1
-pdfminer.six==20221105
-pdfplumber==0.10.2
-google-generativeai==0.3.1
-numpy==1.26.1
-pandas==2.1.1
-matplotlib==3.8.0
-gunicorn==21.2.0
-WTForms==3.1.1
-Flask-WTF==1.2.1
-email-validator==2.1.0
-Pillow==10.1.0
-pytest==7.4.3
+# Actualizado a agosto 2025 - Mejores prácticas y versiones estables
+
+# Core Flask ecosystem
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+Flask-CORS==4.0.1
+Flask-Caching==2.1.0
+
+# Database
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.31
+
+# AI/ML
+google-generativeai==0.5.4
+langchain==0.2.14  # Para mejorar prompts
+anthropic==0.32.0  # Backup para Gemini
+
+# PDF Processing - Modernizado
+pdfplumber==0.11.2  # Reemplaza PyPDF2
+pypdf==4.3.1  # Para operaciones básicas
+tabula-py==2.9.3  # Extracción de tablas
+
+# Data Validation & Processing
+pydantic==2.8.2
+pandas==2.2.2
+numpy==1.26.4
+
+# Security & Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+
+# Utilities
+python-dotenv==1.0.1
+click==8.1.7
+rich==13.7.1  # Better CLI output
+structlog==24.4.0  # Structured logging
+
+# Web Server
+gunicorn==22.0.0
+uvicorn[standard]==0.30.6  # ASGI support
+
+# Development & Testing
+pytest==7.4.0
 pytest-cov==4.1.0
-psycopg2-binary==2.9.9  # Para conexión con PostgreSQL
-whitenoise==6.6.0  # Para servir archivos estáticos en producción
+pytest-playwright==0.4.3
+black==23.7.0
+ruff==0.0.287
+pre-commit==3.8.0
+
+# Monitoring
+sentry-sdk[flask]==2.13.0
+prometheus-flask-exporter==0.23.1
+
+# Rate Limiting
+flask-limiter==3.5.0
+
+# Caching
+redis==5.0.0

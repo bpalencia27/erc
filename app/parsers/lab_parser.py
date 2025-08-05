@@ -4,8 +4,61 @@ Módulo para parsear resultados de laboratorio de diferentes fuentes
 import re
 import logging
 from datetime import datetime
-from app.parsers.pdf_extractor import extract_data_from_pdf, extract_lab_values
+from app.parsers.pdf_extractor import extract_data_from_pdf
 from app.parsers.txt_extractor import extract_data_from_txt
+
+class LabParser:
+    """
+    Clase para parsear resultados de laboratorio desde diferentes fuentes
+    """
+    
+    def __init__(self):
+        """Inicializa el parser de laboratorio"""
+        self.logger = logging.getLogger(__name__)
+    
+    def parse_labs(self, text):
+        """
+        Parsea valores de laboratorio desde texto
+        
+        Args:
+            text (str): Texto a analizar
+            
+        Returns:
+            dict: Valores de laboratorio estructurados
+        """
+        return parse_lab_results(text)
+    
+    def parse_from_pdf(self, pdf_path):
+        """
+        Parsea valores de laboratorio desde un PDF
+        
+        Args:
+            pdf_path (str): Ruta al archivo PDF
+            
+        Returns:
+            dict: Valores de laboratorio estructurados
+        """
+        data = extract_data_from_pdf(pdf_path)
+        if 'error' in data:
+            return {'error': data['error']}
+        
+        return parse_lab_results(data.get('texto_completo', ''))
+    
+    def parse_from_txt(self, txt_path):
+        """
+        Parsea valores de laboratorio desde un archivo TXT
+        
+        Args:
+            txt_path (str): Ruta al archivo TXT
+            
+        Returns:
+            dict: Valores de laboratorio estructurados
+        """
+        data = extract_data_from_txt(txt_path)
+        if 'error' in data:
+            return {'error': data['error']}
+        
+        return parse_lab_results(data.get('texto_completo', ''))
 
 def parse_lab_results(text):
     """

@@ -607,37 +607,52 @@ document.addEventListener('DOMContentLoaded', function() {
     // Parsear resultados de laboratorio (usando IA o backend)
     async function parseLabResults(text, fileName) {
         try {
-            // Primero intentamos con la API del backend
-            const response = await fetch('/api/parse_document', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ text: text, filename: fileName })
-            });
+            // MEJORAR manejo de errores y retry logic
+            const maxRetries = 3;
+            let lastError = null;
             
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    console.log('Resultados extraídos:', data);
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch('/api/parse_document', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            text: text, 
+                            filename: fileName 
+                        }),
+                        signal: AbortSignal.timeout(30000) // 30s timeout
+                    });
                     
-                    // Mostrar resultados en la interfaz
-                    displayLabResults(fileName, data.results);
-                    
-                    // Actualizar datos del paciente si están disponibles
-                    if (data.patient_data) {
-                        updatePatientDataFromLab(data.patient_data);
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            console.error('Endpoint /api/parse_document no encontrado');
+                            showAlert('Error', 'Servicio no disponible. Usando extracción local.');
+                            break;
+                        }
+                        throw new Error(`HTTP ${response.status}`);
                     }
                     
-                    return data.results;
+                    const data = await response.json();
+                    if (data.success) {
+                        displayLabResults(fileName, data.results);
+                        if (data.patient_data) {
+                            updatePatientDataFromLab(data.patient_data);
+                        }
+                        return data.results;
+                    }
+                } catch (err) {
+                    lastError = err;
+                    if (i < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                    }
                 }
             }
             
-            // Si falla, intentamos extracción local con RegEx
-            console.log('Backend parsing failed, using local RegEx extraction');
+            // Fallback a extracción local
+            console.warn('Usando extracción local después de fallos:', lastError);
             const localResults = extractLabResultsWithRegex(text);
-            
-            // Mostrar resultados extraídos localmente
             if (localResults && Object.keys(localResults).length > 0) {
                 displayLabResults(fileName, localResults);
                 return localResults;
@@ -645,38 +660,17 @@ document.addEventListener('DOMContentLoaded', function() {
             
             return null;
         } catch (error) {
-            console.error('Error parsing lab results:', error);
-            
-            // Intentar con RegEx como respaldo
-            const localResults = extractLabResultsWithRegex(text);
-            if (localResults && Object.keys(localResults).length > 0) {
-                displayLabResults(fileName, localResults);
-                return localResults;
-            }
-            
+            console.error('Error crítico:', error);
+            showAlert('Error', 'No se pudo procesar el archivo');
             return null;
         }
     }
     
     // Actualizar datos del paciente desde información extraída del laboratorio
     function updatePatientDataFromLab(patientData) {
-        // Solo actualizar los campos que están vacíos
-        if (patientData.nombre && document.getElementById('nombre').value === '') {
-            document.getElementById('nombre').value = patientData.nombre;
-        }
-        
-        if (patientData.edad && document.getElementById('edad').value === '') {
-            document.getElementById('edad').value = patientData.edad;
-        }
-        
-        if (patientData.sexo && document.getElementById('sexo').value === '') {
-            document.getElementById('sexo').value = patientData.sexo;
-        }
-        
-        // Actualizar la fecha si está disponible
-        if (patientData.fecha_informe && document.getElementById('creatinina_date').value === '') {
-            document.getElementById('creatinina_date').value = patientData.fecha_informe;
-        }
+        if(patientData.nombre) document.getElementById('nombre').value = patientData.nombre;
+        if(patientData.edad) document.getElementById('edad').value = patientData.edad;
+        if(patientData.sexo) document.getElementById('sexo').value = patientData.sexo;
     }
 
     // Extracción de resultados de laboratorio con expresiones regulares
@@ -881,7 +875,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         let labContent = `
             <div class="flex justify-between items-center mb-2">
-                <h4 class="font-bold">${fileName} <span class="text-xs text-blue-500">(Extraído)</span></h4>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" class="lab-select" data-filename="${fileName}">
+                    <h4 class="font-bold">${fileName} <span class="text-xs text-blue-500">(Extraído)</span></h4>
+                </div>
                 <button type="button" class="remove-lab-btn text-red-500 hover:text-red-700 p-1" data-filename="${fileName}">
                     <i class="fas fa-trash-alt"></i>
                 </button>
@@ -919,39 +916,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const manualField = document.getElementById(key);
             if (manualField) {
                 manualField.value = value.value;
-                manualField.setAttribute('readonly', 'true');
-                manualField.classList.add('bg-gray-100');
-                manualField.title = `Valor extraído de ${fileName}`;
+                manualField.classList.add('bg-blue-50', 'editable-lab');
+                manualField.removeAttribute('readonly'); // Permitir edición
                 
-                // Agregar botón para eliminar el valor individual
-                const parentDiv = manualField.closest('.input-group');
-                if (parentDiv) {
-                    // Verificar si ya existe el botón para no duplicarlo
-                    const existingButton = parentDiv.querySelector('.clear-value-btn');
-                    if (!existingButton) {
-                        const clearBtn = document.createElement('button');
-                        clearBtn.type = 'button';
-                        clearBtn.className = 'clear-value-btn btn btn-sm btn-outline-danger';
-                        clearBtn.innerHTML = '<i class="fas fa-times"></i>';
-                        clearBtn.title = 'Eliminar este valor';
-                        clearBtn.addEventListener('click', function() {
-                            // Eliminar el valor y habilitar el campo
-                            manualField.value = '';
-                            manualField.removeAttribute('readonly');
-                            manualField.classList.remove('bg-gray-100');
-                            manualField.title = '';
-                            
-                            // Eliminar el botón
-                            this.remove();
-                            
-                            // Eliminar del estado
-                            if (appState.labResults[key]) {
-                                delete appState.labResults[key];
-                            }
-                        });
-                        parentDiv.appendChild(clearBtn);
-                    }
+                // Crear contenedor para botón si no existe
+                let btnContainer = manualField.parentElement.querySelector('.lab-actions');
+                if (!btnContainer) {
+                    btnContainer = document.createElement('div');
+                    btnContainer.className = 'lab-actions flex gap-1 mt-1';
+                    manualField.parentElement.appendChild(btnContainer);
                 }
+                
+                // Botón guardar
+                const saveBtn = document.createElement('button');
+                saveBtn.type = 'button';
+                saveBtn.className = 'btn btn-xs btn-success';
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Guardar';
+                saveBtn.onclick = () => {
+                    appState.labResults[key].value = parseFloat(manualField.value);
+                    showAlert('Guardado', `${key} actualizado a ${manualField.value}`);
+                    saveBtn.disabled = true;
+                    setTimeout(() => saveBtn.disabled = false, 1000);
+                };
+                
+                btnContainer.appendChild(saveBtn);
             }
         });
         
@@ -1010,23 +998,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Actualizar datos del paciente desde información extraída del laboratorio
     function updatePatientDataFromLab(patientData) {
-        // Solo actualizar los campos que están vacíos
-        if (patientData.nombre && document.getElementById('nombre').value === '') {
-            document.getElementById('nombre').value = patientData.nombre;
-        }
-        
-        if (patientData.edad && document.getElementById('edad').value === '') {
-            document.getElementById('edad').value = patientData.edad;
-        }
-        
-        if (patientData.sexo && document.getElementById('sexo').value === '') {
-            document.getElementById('sexo').value = patientData.sexo;
-        }
-        
-        // Actualizar la fecha si está disponible
-        if (patientData.fecha_informe && document.getElementById('creatinina_date').value === '') {
-            document.getElementById('creatinina_date').value = patientData.fecha_informe;
-        }
+        if(patientData.nombre) document.getElementById('nombre').value = patientData.nombre;
+        if(patientData.edad) document.getElementById('edad').value = patientData.edad;
+        if(patientData.sexo) document.getElementById('sexo').value = patientData.sexo;
     }
 
     // Generar informe con IA
@@ -1099,6 +1073,10 @@ document.addEventListener('DOMContentLoaded', function() {
         alertTitle.textContent = title;
         alertMessage.textContent = message;
         alertModal.classList.add('visible');
+        
+        // AÑADIDO: Cerrar con X
+        const closeBtn = alertModal.querySelector('.close-modal');
+closeBtn.onclick = () => alertModal.classList.remove('visible');
     }
 
     // Event Listeners
@@ -1125,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tabaquismo: formData.get('tabaquismo') === 'on',
                 condSocioeconomicas: formData.get('cond_socioeconomicas') === 'on',
                 fragil: formData.get('fragil') === 'on',
-                adherencia: formData.get('adherencia'),
+                adherencia: formData.get('adherencia') || 'buena',
                 barrerasAcceso: formData.get('barreras_acceso') === 'on',
                 creatinina: formData.get('creatinina'),
                 creatininaFecha: formData.get('creatinina_date'),
@@ -1215,6 +1193,15 @@ document.addEventListener('DOMContentLoaded', function() {
         edadInput.addEventListener('input', calcularTFG);
         pesoInput.addEventListener('input', calcularTFG);
     }
+    
+    // AÑADIR event listeners para campos críticos
+    ['edad','creatinina','peso','talla'].forEach(id => {
+        const elem = document.getElementById(id);
+        if(elem) elem.addEventListener('input', () => {
+            calcularTFG();
+            updateRiskAssessment();
+        });
+    });
     
     // Evento para mostrar/ocultar duración DM
     if (dmCheckbox) {
@@ -1431,4 +1418,55 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+    
+    // Agregar después de loadedLabsContainer en cardia_ia.js
+function initializeLabSelection() {
+    if (!document.querySelector('.lab-controls')) {
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'lab-controls mb-3 flex gap-2';
+        
+        // Botón seleccionar todos
+        const selectAllBtn = document.createElement('button');
+        selectAllBtn.type = 'button';
+        selectAllBtn.className = 'btn btn-sm btn-outline-primary';
+        selectAllBtn.innerHTML = '<i class="fas fa-check-square"></i> Seleccionar Todos';
+        selectAllBtn.onclick = toggleSelectAll;
+        
+        // Botón eliminar seleccionados
+        const deleteSelectedBtn = document.createElement('button');
+        deleteSelectedBtn.type = 'button';
+        deleteSelectedBtn.className = 'btn btn-sm btn-danger';
+        deleteSelectedBtn.innerHTML = '<i class="fas fa-trash"></i> Eliminar Seleccionados';
+        deleteSelectedBtn.onclick = deleteSelected;
+        
+        controlsDiv.appendChild(selectAllBtn);
+        controlsDiv.appendChild(deleteSelectedBtn);
+        loadedLabsContainer.insertBefore(controlsDiv, loadedLabsContainer.firstChild);
+    }
+}
+
+function toggleSelectAll() {
+    const checkboxes = document.querySelectorAll('.lab-select');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+function deleteSelected() {
+    const selected = document.querySelectorAll('.lab-select:checked');
+    if (selected.length === 0) {
+        showAlert('Atención', 'No hay archivos seleccionados');
+        return;
+    }
+    
+    if (confirm(`¿Eliminar ${selected.length} archivo(s)?`)) {
+        selected.forEach(cb => {
+            const card = cb.closest('.lab-result-card');
+            const fileName = cb.dataset.filename;
+            removeLabResults(fileName, card);
+        });
+    }
+}
+
+// Llamar después de cargar labs
+if (loadedLabsContainer) initializeLabSelection();
 });

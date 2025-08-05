@@ -4,6 +4,33 @@ Módulo para la extracción de documentos TXT
 import re
 import logging
 
+def parse_txt_file(txt_path):
+    """
+    Lee y devuelve el contenido de un archivo TXT.
+    
+    Args:
+        txt_path (str): Ruta al archivo TXT
+        
+    Returns:
+        str: Contenido del archivo de texto
+    """
+    try:
+        with open(txt_path, 'r', encoding='utf-8') as file:
+            text_content = file.read()
+        return text_content
+    except UnicodeDecodeError:
+        # Si falla con UTF-8, intentar con otras codificaciones
+        try:
+            with open(txt_path, 'r', encoding='latin-1') as file:
+                text_content = file.read()
+            return text_content
+        except Exception as e:
+            logging.error(f"Error al leer archivo TXT {txt_path}: {str(e)}")
+            return ""
+    except Exception as e:
+        logging.error(f"Error al leer archivo TXT {txt_path}: {str(e)}")
+        return ""
+
 def extract_data_from_txt(txt_path):
     """
     Extrae datos de un archivo TXT de laboratorio.

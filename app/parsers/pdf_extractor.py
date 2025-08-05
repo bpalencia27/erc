@@ -6,6 +6,37 @@ import logging
 import os
 import PyPDF2
 
+def extract_pdf_content(pdf_path):
+    """
+    Extrae el contenido de texto de un archivo PDF.
+    
+    Args:
+        pdf_path (str): Ruta al archivo PDF
+        
+    Returns:
+        str: Texto extraído del PDF
+    """
+    try:
+        if not os.path.exists(pdf_path):
+            logging.error(f"Archivo PDF no encontrado: {pdf_path}")
+            return ""
+        
+        # Extraer texto usando PyPDF2
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            
+            # Extraer texto de todas las páginas
+            texto_completo = ""
+            for page_num in range(len(reader.pages)):
+                page = reader.pages[page_num]
+                texto_completo += page.extract_text() + "\n"
+            
+            return texto_completo
+            
+    except Exception as e:
+        logging.error(f"Error al extraer contenido del PDF {pdf_path}: {str(e)}")
+        return ""
+
 def extract_data_from_pdf(pdf_path):
     """
     Extrae datos de un archivo PDF de laboratorio.
@@ -109,3 +140,24 @@ def extract_lab_values(text):
         'results': lab_values,
         'patient_data': patient_data
     }
+
+def extract_patient_info(text):
+    """Extrae información personal del paciente"""
+    patterns = {
+        'nombre': r'(?:Paciente|Nombre):\s*([A-Za-zÁÉÍÓÚáéíóúÑñ\s]+?)(?:\n|Edad|Sexo|$)',
+        'edad': r'Edad:\s*(\d+)\s*años?',
+        'sexo': r'Sexo:\s*(M|F|Masculino|Femenino)',
+        'documento': r'(?:CC|Cédula|DNI):\s*([\d.-]+)',
+        'telefono': r'Tel[éf]*ono:\s*([\d\s-]+)'
+    }
+    
+    patient_data = {}
+    for field, pattern in patterns.items():
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            value = match.group(1).strip()
+            if field == 'sexo':
+                value = 'M' if value[0].upper() == 'M' else 'F'
+            patient_data[field] = value
+    
+    return patient_data

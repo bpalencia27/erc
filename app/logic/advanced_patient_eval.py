@@ -241,20 +241,25 @@ def determinar_etapa_erc(tfg):
         tfg (float): Tasa de Filtración Glomerular en ml/min/1.73m²
         
     Returns:
-        str: Etapa de ERC (1, 2, 3a, 3b, 4, 5)
+        str: Etapa de ERC (g1, g2, g3a, g3b, g4, g5)
     """
+    try:
+        tfg = float(tfg)
+    except (TypeError, ValueError):
+        return "indeterminado"
+        
     if tfg >= 90:
-        return 1
+        return "g1"
     elif tfg >= 60:
-        return 2
+        return "g2"
     elif tfg >= 45:
-        return "3a"
+        return "g3a"
     elif tfg >= 30:
-        return "3b"
+        return "g3b"
     elif tfg >= 15:
-        return 4
+        return "g4"
     else:
-        return 5
+        return "g5"
 
 def calcular_etapa_erc_para_config(tfg):
     """

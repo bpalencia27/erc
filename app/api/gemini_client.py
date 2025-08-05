@@ -1,352 +1,563 @@
 """
-Cliente para interactuar con la API de Google Gemini
+Cliente mejorado de Google Gemini con fallback y prompt engineering avanzado
+Implementa chain-of-thought, few-shot prompting y manejo robusto de errores
 """
 import os
+import time
 import json
-import logging
-from typing import Dict, Any, Optional
-from datetime import datetime
-from dotenv import load_dotenv
-from app.utils.caching import cached_result
-from google.generativeai import GenerativeModel
-from flask import current_app
+from typing import Dict, Any, Optional, List, Union, Callable
+from functools import wraps
+import google.generativeai as genai
+import anthropic
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import structlog
+from dataclasses import dataclass
+from enum import Enum
 
-# Cargar variables de entorno
-load_dotenv()
+logger = structlog.get_logger()
 
-def get_gemini_client():
-    api_key = os.environ.get('GEMINI_API_KEY')
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY no está configurada en las variables de entorno")
+class PromptStrategy(Enum):
+    """Estrategias de prompting disponibles"""
+    CHAIN_OF_THOUGHT = "chain_of_thought"
+    FEW_SHOT = "few_shot"
+    ZERO_SHOT = "zero_shot"
+    MEDICAL_EXPERT = "medical_expert"
+
+@dataclass
+class GeminiConfig:
+    """Configuración para el cliente Gemini"""
+    api_key: str
+    model_name: str = "gemini-1.5-pro"
+    temperature: float = 0.7
+    max_output_tokens: int = 8192
+    timeout: int = 30
+    retry_attempts: int = 3
+    fallback_enabled: bool = True
+    fallback_provider: str = "anthropic"  # Proveedor alternativo si Gemini falla
+    cache_enabled: bool = True
+    cache_ttl: int = 3600  # 1 hora por defecto
+
+class ModelResponse:
+    """Clase para manejar respuestas de modelos de forma unificada"""
     
-    return GenerativeModel(model_name="gemini-pro", api_key=api_key)
+    def __init__(self, 
+                 content: str, 
+                 provider: str,
+                 success: bool = True,
+                 error: Optional[str] = None,
+                 metadata: Optional[Dict[str, Any]] = None):
+        self.content = content
+        self.provider = provider
+        self.success = success
+        self.error = error
+        self.metadata = metadata or {}
+        self.timestamp = time.time()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convierte la respuesta a diccionario"""
+        return {
+            "content": self.content,
+            "provider": self.provider,
+            "success": self.success,
+            "error": self.error,
+            "metadata": self.metadata,
+            "timestamp": self.timestamp
+        }
+    
+    @classmethod
+    def error_response(cls, error_message: str, provider: str = "unknown"):
+        """Crea una respuesta de error"""
+        return cls(
+            content="",
+            provider=provider,
+            success=False,
+            error=error_message
+        )
+
+class ResponseCache:
+    """Caché simple para respuestas de modelos"""
+    
+    def __init__(self, ttl: int = 3600):
+        self.cache = {}
+        self.ttl = ttl  # Tiempo de vida en segundos
+    
+    def get(self, key: str) -> Optional[ModelResponse]:
+        """Obtiene una respuesta cacheada si existe y no ha expirado"""
+        if key in self.cache:
+            entry = self.cache[key]
+            if time.time() - entry.timestamp < self.ttl:
+                logger.info("Cache hit", key=key)
+                return entry
+            else:
+                # Entrada expirada
+                del self.cache[key]
+        return None
+    
+    def set(self, key: str, response: ModelResponse) -> None:
+        """Guarda una respuesta en caché"""
+        if response.success:  # Solo cachear respuestas exitosas
+            self.cache[key] = response
+            logger.debug("Response cached", key=key)
+    
+    def clear(self) -> None:
+        """Limpia toda la caché"""
+        self.cache.clear()
 
 class GeminiClient:
-    """Cliente para interactuar con la API de Google Gemini."""
+    """Cliente mejorado para Google Gemini con fallback y mejores prácticas"""
     
-    def __init__(self):
-        """Inicializa el cliente con la API key de Gemini."""
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        self.use_simulation = not self.api_key
+    def __init__(self, config: Optional[GeminiConfig] = None):
+        self.config = config or self._load_config()
+        self._initialize_clients()
+        self.prompt_templates = self._load_prompt_templates()
+        self.cache = ResponseCache(ttl=self.config.cache_ttl) if self.config.cache_enabled else None
         
-        if self.use_simulation:
-            logging.warning("API key de Google Gemini no configurada, usando modo simulado")
-        else:
-            # Configurar la API de Gemini con la clave
-            self.model = get_gemini_client()
+    def _load_config(self) -> GeminiConfig:
+        """Carga la configuración desde variables de entorno"""
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            logger.warning("GEMINI_API_KEY not found, using fallback mode")
+            
+        return GeminiConfig(
+            api_key=api_key or "dummy-key-for-fallback",
+            model_name=os.getenv('GEMINI_MODEL', 'gemini-1.5-pro'),
+            temperature=float(os.getenv('GEMINI_TEMPERATURE', '0.7')),
+            max_output_tokens=int(os.getenv('GEMINI_MAX_TOKENS', '8192')),
+            fallback_enabled=os.getenv('GEMINI_FALLBACK_ENABLED', 'true').lower() == 'true',
+            fallback_provider=os.getenv('FALLBACK_PROVIDER', 'anthropic'),
+            cache_enabled=os.getenv('GEMINI_CACHE_ENABLED', 'true').lower() == 'true',
+            cache_ttl=int(os.getenv('GEMINI_CACHE_TTL', '3600'))
+        )
     
-    def extract_lab_results(self, text):
-        """Extrae resultados de laboratorio desde un texto utilizando IA."""
-        if self.use_simulation:
-            # Modo simulado cuando no hay API key
-            return {
-                "results": {
-                    "creatinina": {"value": "1.2", "unit": "mg/dL"},
-                    "glucosa": {"value": "105", "unit": "mg/dL"},
-                    "ldl": {"value": "110", "unit": "mg/dL"}
-                }
-            }
-            
-        prompt = f"""
-        Analiza el siguiente texto de un reporte médico y extrae los valores de laboratorio.
-        Por favor, extrae con precisión los siguientes datos:
+    def _initialize_clients(self):
+        """Inicializa el cliente principal y los de fallback"""
+        # Inicializar Gemini
+        self.is_gemini_configured = False
+        if self.config.api_key and self.config.api_key != "dummy-key-for-fallback":
+            try:
+                genai.configure(api_key=self.config.api_key)
+                self.gemini_model = genai.GenerativeModel(
+                    self.config.model_name,
+                    generation_config={
+                        "temperature": self.config.temperature,
+                        "max_output_tokens": self.config.max_output_tokens,
+                        "top_p": 0.95,
+                    }
+                )
+                self.is_gemini_configured = True
+                logger.info(f"Gemini client initialized with model: {self.config.model_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini client: {e}")
         
-        1. Datos del paciente (nombre, edad, sexo, fecha del informe)
-        2. Valores de laboratorio, prestando especial atención a:
-           - Creatinina (mg/dL)
-           - Glucosa (mg/dL)
-           - Colesterol total, LDL, HDL (mg/dL)
-           - Triglicéridos (mg/dL)
-           - Potasio, Sodio (mEq/L)
-           - Calcio, Fósforo (mg/dL)
-           - Hemoglobina (g/dL)
-           - PTH (pg/mL)
-           - Albúmina (g/dL)
-           - HbA1c (%)
-           - Ácido úrico (mg/dL)
-           - Urea o BUN (mg/dL)
-        
-        Devuelve un objeto JSON con este formato exacto:
-        {{
-            "patient_data": {{
-                "nombre": "Nombre del paciente",
-                "edad": "65",
-                "sexo": "m/f",
-                "fecha_informe": "YYYY-MM-DD"
-            }},
-            "results": {{
-                "creatinina": {{ "value": "1.2", "unit": "mg/dL" }},
-                "glucosa": {{ "value": "110", "unit": "mg/dL" }},
-                ...
-            }}
-        }}
-        
-        Texto a analizar:
-        {text}
-        """
-        
-        try:
-            response = self.model.generate_content(prompt)
-            result_text = response.text
-            
-            # Extraer solo el JSON (eliminar cualquier texto adicional)
-            json_start = result_text.find('{')
-            json_end = result_text.rfind('}') + 1
-            
-            if json_start >= 0 and json_end > json_start:
-                json_str = result_text[json_start:json_end]
-                return json.loads(json_str)
+        # Inicializar cliente de fallback (Anthropic Claude)
+        self.is_fallback_configured = False
+        if self.config.fallback_enabled:
+            fallback_api_key = os.getenv('ANTHROPIC_API_KEY')
+            if fallback_api_key:
+                try:
+                    self.fallback_client = anthropic.Anthropic(api_key=fallback_api_key)
+                    self.is_fallback_configured = True
+                    logger.info("Fallback client (Anthropic) initialized")
+                except Exception as e:
+                    logger.error(f"Failed to initialize fallback client: {e}")
             else:
-                # Si no se encuentra un JSON válido, devolver vacío
-                logging.warning(f"No se pudo extraer JSON de la respuesta: {result_text}")
-                return {}
+                logger.warning("Fallback enabled but no API key found for provider")
+    
+    def _load_prompt_templates(self) -> Dict[str, str]:
+        """Carga plantillas de prompts optimizadas para casos médicos"""
+        return {
+            "erc_analysis": """
+Actúa como un nefrólogo experto con 20 años de experiencia en enfermedad renal crónica.
+Analiza los siguientes datos del paciente paso a paso:
+
+DATOS DEL PACIENTE:
+{patient_data}
+
+INSTRUCCIONES:
+1. Primero, evalúa la función renal calculando el TFG exacto
+2. Clasifica la etapa de ERC según KDIGO 2024
+3. Identifica factores de riesgo cardiovascular
+4. Analiza tendencias en los valores de laboratorio
+5. Proporciona recomendaciones específicas
+
+Utiliza el siguiente formato de respuesta:
+### EVALUACIÓN RENAL
+- TFG calculado: [valor] ml/min/1.73m²
+- Etapa ERC: [clasificación]
+- Progresión: [análisis de tendencia]
+
+### FACTORES DE RIESGO
+- Cardiovasculares: [lista detallada]
+- Metabólicos: [lista detallada]
+- Otros: [lista detallada]
+
+### RECOMENDACIONES
+1. [Recomendación específica con justificación]
+2. [Recomendación específica con justificación]
+3. [Seguimiento sugerido]
+
+### ALERTAS CLÍNICAS
+- [Valores críticos o situaciones urgentes]
+""",
+            
+            "lab_extraction": """
+Extrae TODOS los valores de laboratorio del siguiente texto.
+Sé extremadamente preciso con números y unidades.
+
+TEXTO:
+{text}
+
+FORMATO DE SALIDA REQUERIDO (JSON):
+{
+    "hemograma": {
+        "hemoglobina": {"valor": null, "unidad": "g/dL"},
+        "hematocrito": {"valor": null, "unidad": "%"},
+        "leucocitos": {"valor": null, "unidad": "x10³/μL"},
+        "plaquetas": {"valor": null, "unidad": "x10³/μL"}
+    },
+    "funcion_renal": {
+        "creatinina": {"valor": null, "unidad": "mg/dL"},
+        "bun": {"valor": null, "unidad": "mg/dL"},
+        "acido_urico": {"valor": null, "unidad": "mg/dL"},
+        "tfg": {"valor": null, "unidad": "ml/min/1.73m²"}
+    },
+    "electrolitos": {
+        "sodio": {"valor": null, "unidad": "mEq/L"},
+        "potasio": {"valor": null, "unidad": "mEq/L"},
+        "cloro": {"valor": null, "unidad": "mEq/L"},
+        "calcio": {"valor": null, "unidad": "mg/dL"},
+        "fosforo": {"valor": null, "unidad": "mg/dL"}
+    },
+    "perfil_lipidico": {
+        "colesterol_total": {"valor": null, "unidad": "mg/dL"},
+        "ldl": {"valor": null, "unidad": "mg/dL"},
+        "hdl": {"valor": null, "unidad": "mg/dL"},
+        "trigliceridos": {"valor": null, "unidad": "mg/dL"}
+    },
+    "hepaticos": {
+        "ast": {"valor": null, "unidad": "U/L"},
+        "alt": {"valor": null, "unidad": "U/L"},
+        "bilirrubina_total": {"valor": null, "unidad": "mg/dL"}
+    },
+    "glucemia": {
+        "glucosa": {"valor": null, "unidad": "mg/dL"},
+        "hba1c": {"valor": null, "unidad": "%"}
+    }
+}
+""",
+            "medical_summary": """
+Crea un resumen médico conciso de la siguiente información clínica.
+Incluye solo los datos relevantes para la evaluación renal y cardiovascular.
+
+INFORMACIÓN CLÍNICA:
+{clinical_info}
+
+FORMATO DE RESPUESTA:
+### RESUMEN CLÍNICO
+- Diagnósticos principales:
+- Medicación actual:
+- Factores de riesgo:
+- Valores críticos:
+
+### CONCLUSIONES
+- [Evaluación concisa del estado renal y cardiovascular]
+"""
+        }
+    
+    def _generate_cache_key(self, prompt: str, strategy: Optional[PromptStrategy] = None) -> str:
+        """Genera una clave única para caché basada en el prompt y estrategia"""
+        # Simplificado - en producción se recomienda usar hash criptográfico
+        strategy_str = strategy.value if strategy else "default"
+        prompt_hash = hash(prompt) % 10000000  # Simplificado
+        return f"{strategy_str}_{prompt_hash}"
+    
+    @retry(
+        retry=retry_if_exception_type((genai.types.BlockedPromptException, TimeoutError, ConnectionError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    async def _generate_with_gemini(self, prompt: str) -> ModelResponse:
+        """Genera respuesta utilizando Gemini con manejo de errores"""
+        try:
+            response = await self.gemini_model.generate_content_async(prompt)
+            return ModelResponse(
+                content=response.text,
+                provider="gemini",
+                metadata={"model": self.config.model_name}
+            )
+        except genai.types.BlockedPromptException as e:
+            logger.warning("Prompt blocked by Gemini safety settings", error=str(e))
+            raise
+        except Exception as e:
+            logger.error("Error generating content with Gemini", error=str(e))
+            return ModelResponse.error_response(str(e), provider="gemini")
+    
+    async def _generate_with_anthropic(self, prompt: str) -> ModelResponse:
+        """Genera respuesta utilizando Anthropic Claude como fallback"""
+        try:
+            response = await self.fallback_client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return ModelResponse(
+                content=response.content[0].text,
+                provider="anthropic",
+                metadata={"model": "claude-3-haiku"}
+            )
+        except Exception as e:
+            logger.error("Error generating content with Anthropic fallback", error=str(e))
+            return ModelResponse.error_response(str(e), provider="anthropic")
+    
+    async def _fallback_response(self, prompt: str) -> ModelResponse:
+        """Genera una respuesta de fallback cuando todos los proveedores fallan"""
+        # Respuesta offline básica
+        if "lab_extraction" in prompt.lower():
+            return ModelResponse(
+                content=json.dumps({"error": "No se pudo procesar la solicitud"}),
+                provider="offline_fallback",
+                success=False,
+                error="All providers failed"
+            )
+        else:
+            return ModelResponse(
+                content="Lo siento, no puedo generar una respuesta en este momento. Por favor, revise los datos manualmente o intente más tarde.",
+                provider="offline_fallback",
+                success=False,
+                error="All providers failed"
+            )
+    
+    async def generate(self, 
+                     prompt: str, 
+                     strategy: Optional[PromptStrategy] = None,
+                     template_name: Optional[str] = None,
+                     template_vars: Optional[Dict[str, Any]] = None) -> ModelResponse:
+        """
+        Genera contenido con el prompt especificado y estrategia
+        
+        Args:
+            prompt: El prompt base para la generación
+            strategy: Estrategia de prompting a utilizar
+            template_name: Nombre de la plantilla a utilizar
+            template_vars: Variables para la plantilla
+            
+        Returns:
+            ModelResponse con el contenido generado
+        """
+        # Preparar el prompt final
+        final_prompt = prompt
+        
+        # Si se especifica una plantilla, usarla
+        if template_name and template_name in self.prompt_templates:
+            template = self.prompt_templates[template_name]
+            if template_vars:
+                try:
+                    final_prompt = template.format(**template_vars)
+                except KeyError as e:
+                    logger.error(f"Missing template variable: {e}")
+                    return ModelResponse.error_response(f"Missing template variable: {e}")
+        
+        # Aplicar estrategia de prompting si se especifica
+        if strategy:
+            final_prompt = self._apply_prompt_strategy(final_prompt, strategy)
+        
+        # Verificar caché primero si está habilitada
+        if self.cache:
+            cache_key = self._generate_cache_key(final_prompt, strategy)
+            cached_response = self.cache.get(cache_key)
+            if cached_response:
+                return cached_response
+        
+        # Intento con Gemini
+        if self.is_gemini_configured:
+            response = await self._generate_with_gemini(final_prompt)
+            if response.success:
+                if self.cache:
+                    self.cache.set(self._generate_cache_key(final_prompt, strategy), response)
+                return response
+        
+        # Si Gemini falla y el fallback está habilitado, intentar con el proveedor de fallback
+        if self.config.fallback_enabled and self.is_fallback_configured:
+            logger.info("Gemini failed or not configured, trying fallback provider")
+            response = await self._generate_with_anthropic(final_prompt)
+            if response.success:
+                if self.cache:
+                    self.cache.set(self._generate_cache_key(final_prompt, strategy), response)
+                return response
+        
+        # Si todo falla, usar respuesta offline
+        return await self._fallback_response(final_prompt)
+    
+    def _apply_prompt_strategy(self, prompt: str, strategy: PromptStrategy) -> str:
+        """Aplica una estrategia de prompting al prompt base"""
+        if strategy == PromptStrategy.CHAIN_OF_THOUGHT:
+            return f"{prompt}\n\nResuelve este problema paso a paso, explicando tu razonamiento en cada etapa."
+        
+        elif strategy == PromptStrategy.FEW_SHOT:
+            # Ejemplo simplificado - en producción, usar ejemplos más elaborados
+            few_shot_examples = """
+Ejemplo 1:
+Paciente: Mujer, 65 años, creatinina 1.8 mg/dL, albuminuria 300 mg/g
+Análisis: TFG = 29 mL/min/1.73m², ERC etapa G3b A3, alto riesgo cardiovascular
+Recomendación: Control estricto de PA < 130/80, IECA/ARA2, estatinas, nefroprotección
+
+Ejemplo 2:
+Paciente: Hombre, 58 años, creatinina 2.5 mg/dL, albuminuria 150 mg/g
+Análisis: TFG = 23 mL/min/1.73m², ERC etapa G4 A2, riesgo muy alto de progresión
+Recomendación: Referir a nefrología, restricción proteica, control metabólico estricto
+
+Ahora tu caso:
+"""
+            return f"{few_shot_examples}\n{prompt}"
+        
+        elif strategy == PromptStrategy.MEDICAL_EXPERT:
+            medical_context = """
+Eres un especialista en nefrología y medicina interna con experiencia en enfermedad renal crónica.
+Utilizas las guías KDIGO 2024 para la evaluación y manejo de la ERC.
+Tienes conocimiento actualizado sobre marcadores de función renal, factores de riesgo cardiovascular,
+y evidencia reciente sobre nefroprotección y objetivos terapéuticos.
+
+Analiza el siguiente caso clínico con un enfoque sistemático y científico:
+"""
+            return f"{medical_context}\n{prompt}"
+        
+        # Default - zero shot
+        return prompt
+    
+    def process_medical_data(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Procesa datos médicos completos utilizando el modelo
+        
+        Args:
+            patient_data: Diccionario con los datos del paciente
+            
+        Returns:
+            Diccionario con resultados del análisis
+        """
+        try:
+            # Convertir datos del paciente a formato texto
+            patient_text = self._format_patient_data(patient_data)
+            
+            # Generar análisis
+            analysis_response = self.generate(
+                prompt="",
+                template_name="erc_analysis",
+                template_vars={"patient_data": patient_text},
+                strategy=PromptStrategy.MEDICAL_EXPERT
+            )
+            
+            # Si la respuesta es exitosa, formatear el resultado
+            if analysis_response.success:
+                return {
+                    "analysis": analysis_response.content,
+                    "status": "success",
+                    "provider": analysis_response.provider,
+                    "timestamp": analysis_response.timestamp
+                }
+            else:
+                return {
+                    "analysis": "No se pudo generar el análisis. Por favor revise los datos manualmente.",
+                    "status": "error",
+                    "error": analysis_response.error,
+                    "timestamp": time.time()
+                }
                 
         except Exception as e:
-            logging.error(f"Error al extraer resultados con IA: {str(e)}")
-            logging.error(f"Respuesta original: {response.text if 'response' in locals() else 'N/A'}")
-            return {}
+            logger.exception("Error processing medical data", error=str(e))
+            return {
+                "analysis": "Error en el procesamiento de datos médicos.",
+                "status": "error",
+                "error": str(e),
+                "timestamp": time.time()
+            }
+    
+    def _format_patient_data(self, patient_data: Dict[str, Any]) -> str:
+        """Formatea los datos del paciente para el prompt"""
+        # Implementación simplificada
+        sections = []
         
-    def generate_patient_report(self, patient_data):
-        """Genera un informe clínico completo basado en los datos del paciente."""
-        if self.use_simulation:
-            # Modo simulado cuando no hay API key
-            return """
-            <h3>Evaluación Médica del Paciente</h3>
-            <p>Este es un informe simulado ya que no se ha configurado la API key de Google Gemini.</p>
-            <p>Por favor, configure la variable de entorno GEMINI_API_KEY para obtener informes reales.</p>
-            """
-            
-        # Preparar datos para el prompt
-        nombre = patient_data.get('nombre', 'Paciente')
-        edad = patient_data.get('edad', '')
-        sexo = 'Masculino' if patient_data.get('sexo') == 'm' else 'Femenino'
-        diagnosticos = ', '.join(patient_data.get('diagnosticos', [])) or 'Ninguno'
+        # Datos demográficos
+        if "demographics" in patient_data:
+            demo = patient_data["demographics"]
+            demo_text = f"Paciente de {demo.get('age', 'N/A')} años, {demo.get('gender', 'N/A')}"
+            sections.append(f"DATOS DEMOGRÁFICOS:\n{demo_text}")
         
-        # Datos de laboratorio
-        lab_results = patient_data.get('labResults', {})
-        lab_text = ""
-        for key, value in lab_results.items():
-            if isinstance(value, dict):
-                lab_text += f"- {key.capitalize()}: {value.get('value')} {value.get('unit', '')}\n"
+        # Laboratorios
+        if "lab_results" in patient_data and patient_data["lab_results"]:
+            lab_text = "RESULTADOS DE LABORATORIO:\n"
+            for date, labs in patient_data["lab_results"].items():
+                lab_text += f"Fecha: {date}\n"
+                for category, values in labs.items():
+                    lab_text += f"  {category.upper()}:\n"
+                    for test, result in values.items():
+                        if isinstance(result, dict) and "valor" in result and "unidad" in result:
+                            lab_text += f"    - {test}: {result['valor']} {result['unidad']}\n"
+                        else:
+                            lab_text += f"    - {test}: {result}\n"
+            sections.append(lab_text)
+        
+        # Comorbilidades
+        if "comorbidities" in patient_data and patient_data["comorbidities"]:
+            comorbid_text = "COMORBILIDADES:\n"
+            for condition in patient_data["comorbidities"]:
+                comorbid_text += f"- {condition}\n"
+            sections.append(comorbid_text)
         
         # Medicamentos
-        medicamentos = patient_data.get('medicamentos', [])
-        med_text = ""
-        for med in medicamentos:
-            med_text += f"- {med.get('nombre', '')} {med.get('dosis', '')} {med.get('frecuencia', '')}\n"
+        if "medications" in patient_data and patient_data["medications"]:
+            med_text = "MEDICAMENTOS ACTUALES:\n"
+            for med in patient_data["medications"]:
+                med_text += f"- {med}\n"
+            sections.append(med_text)
         
-        # Crear prompt
-        prompt = f"""
-        Genera un informe clínico detallado en formato HTML para el siguiente paciente:
-        
-        DATOS BÁSICOS:
-        - Nombre: {nombre}
-        - Edad: {edad} años
-        - Sexo: {sexo}
-        - IMC: {patient_data.get('imc', 'No disponible')}
-        - TFG: {patient_data.get('tfg', 'No disponible')}
-        - Riesgo Cardiovascular: {patient_data.get('riesgoCardiovascular', 'No calculado')}
-        
-        DIAGNÓSTICOS:
-        {diagnosticos}
-        
-        RESULTADOS DE LABORATORIO:
-        {lab_text if lab_text else "No disponibles"}
-        
-        MEDICAMENTOS ACTUALES:
-        {med_text if med_text else "No hay medicamentos registrados"}
-        
-        PRESIÓN ARTERIAL:
-        {self._format_blood_pressure(patient_data.get('presionArterial', []))}
-        
-        NOTAS ADICIONALES:
-        - Condición de fragilidad: {"Sí" if patient_data.get('fragil') else "No"}
-        - Adherencia al tratamiento: {patient_data.get('adherencia', 'No especificada')}
-        - Barreras de acceso: {"Sí" if patient_data.get('barrerasAcceso') else "No"}
-        
-        Por favor, genera un informe clínico completo que incluya:
-        1. Una evaluación general del paciente.
-        2. Análisis de riesgo cardiovascular.
-        3. Interpretación de los resultados de laboratorio.
-        4. Recomendaciones de tratamiento y ajustes de medicación si fuera necesario.
-        5. Plan de seguimiento.
-        
-        El informe debe estar en formato HTML con secciones claramente definidas. Usa tags como <h3> para títulos de sección, <p> para párrafos, <ul> y <li> para listas, y <strong> para énfasis. Evita usar clases CSS o estilos complejos.
-        """
-        
-        try:
-            response = self.model.generate_content(prompt)
-            html_content = response.text
-            
-            # Limpiar el HTML si es necesario
-            if "```html" in html_content:
-                html_content = html_content.split("```html")[1].split("```")[0].strip()
-            elif "```" in html_content:
-                html_content = html_content.split("```")[1].split("```")[0].strip()
-            
-            return html_content
-            
-        except Exception as e:
-            logging.error(f"Error al generar informe con IA: {str(e)}")
-            return f"<p>Error al generar informe: {str(e)}</p>"
+        # Unir todas las secciones
+        return "\n\n".join(sections)
     
-    def _format_blood_pressure(self, blood_pressure_data):
-        """Formatea los datos de presión arterial para el prompt."""
-        if not blood_pressure_data:
-            return "No hay registros de presión arterial"
-            
-        result = ""
-        for bp in blood_pressure_data:
-            result += f"- {bp.get('sistolica', '')}/{bp.get('diastolica', '')} mmHg (Fecha: {bp.get('fecha', 'No registrada')})\n"
-            
-        return result
-    
-    def generate_medical_report(self, patient_data, report_type="complete"):
+    async def extract_lab_values(self, text: str) -> Dict[str, Any]:
         """
-        Genera un informe médico basado en los datos del paciente.
+        Extrae valores de laboratorio de texto no estructurado
         
         Args:
-            patient_data (dict): Datos completos del paciente
-            report_type (str): Tipo de informe ('complete', 'summary', 'follow_up')
+            text: Texto con resultados de laboratorio
             
         Returns:
-            str: Texto del informe generado
+            Diccionario con valores de laboratorio estructurados
         """
-        # Verificar modo de simulación
-        if self.use_simulation:
-            return self._generate_simulated_report(patient_data, report_type)
-            
         try:
-            # Construir el prompt según el tipo de informe
-            if report_type == "complete":
-                prompt = self._build_complete_report_prompt(patient_data)
-            elif report_type == "summary":
-                prompt = self._build_summary_prompt(patient_data)
-            elif report_type == "follow_up":
-                prompt = self._build_follow_up_prompt(patient_data)
+            response = await self.generate(
+                prompt="",
+                template_name="lab_extraction",
+                template_vars={"text": text},
+                strategy=PromptStrategy.ZERO_SHOT
+            )
+            
+            if response.success:
+                try:
+                    # Intentar parsear como JSON
+                    lab_data = json.loads(response.content)
+                    return {
+                        "lab_data": lab_data,
+                        "status": "success",
+                        "provider": response.provider
+                    }
+                except json.JSONDecodeError:
+                    logger.error("Failed to parse lab extraction response as JSON")
+                    return {
+                        "lab_data": {},
+                        "status": "error",
+                        "error": "Invalid JSON response format"
+                    }
             else:
-                prompt = self._build_complete_report_prompt(patient_data)
+                return {
+                    "lab_data": {},
+                    "status": "error",
+                    "error": response.error
+                }
                 
-            # Llamar a la API de Gemini
-            response = self.model.generate_content(prompt)
-            return self._process_ai_response(response)
-            
         except Exception as e:
-            logging.error(f"Error al generar informe con Gemini: {str(e)}")
-            # Devolver un informe de respaldo
-            return self._generate_fallback_report(patient_data)
-    
-    @cached_result(expiration_seconds=3600)  # Cachear por 1 hora
-    def process_advanced_evaluation(self, payload: Dict[str, Any]) -> str:
-        """
-        Procesa una evaluación avanzada y genera un informe detallado.
-        Este método usa el nuevo formato de payload según los requisitos.
-        
-        Args:
-            payload: Payload JSON con la estructura requerida para la API de Gemini
-            
-        Returns:
-            str: Informe médico generado
-        """
-        if not self.api_key:
-            logging.warning("Usando respuesta simulada porque no hay clave API configurada")
-            return self._generate_advanced_report(payload)
-        
-        try:
-            # Construir el prompt para Gemini según las instrucciones específicas
-            prompt = """
-Eres un médico experto en Medicina Interna y Nefrología. Tienes total autonomía para redactar un informe clínico coherente y profesional, utilizando los datos estructurados que se te proporcionan en este JSON. Sin embargo, debes adherirte estrictamente a las siguientes directivas:
-
-Contenido Obligatorio e Inflexible: La siguiente información del JSON debe ser incluida en tu redacción de forma explícita y sin alteraciones:
-- La Clasificación del Riesgo Cardiovascular y su justificación.
-- La tabla o lista detallada del Cumplimiento de Metas Terapéuticas, incluyendo parámetros, valores, metas, puntajes y el estado final.
-- El Plan de Seguimiento, mostrando las fechas exactas (DD/MM/AAAA) para los próximos laboratorios y la cita de control médico.
-
-Recomendaciones Dinámicas: Genera recomendaciones no farmacológicas personalizadas (dieta, ejercicio) que sean relevantes para la condición específica del paciente descrita en los datos.
-
-Remisiones Estándar Obligatorias: En todos los informes, independientemente del paciente, debes incluir la siguiente nota de remisión:
-'Se remite a Enfermería para la gestión de citas con Odontología, Nutrición y Psicología. Adicionalmente, se remite al servicio de Vacunación para completar o verificar el esquema según la edad y las condiciones de riesgo del paciente.'
-"""
-            
-            # En una implementación real, aquí se enviaría el prompt y el payload a la API de Gemini
-            # Por ahora, usamos un informe simulado
-            return self._generate_advanced_report(payload)
-            
-        except Exception as e:
-            logging.error(f"Error al generar informe avanzado con Gemini: {str(e)}")
-            return "Error al generar el informe médico. Por favor, inténtelo de nuevo."
-    
-    def _build_complete_report_prompt(self, patient_data):
-        """Construye el prompt para un informe completo."""
-        # Extraer datos relevantes del paciente
-        name = patient_data.get('paciente', {}).get('nombre', 'Paciente')
-        age = patient_data.get('paciente', {}).get('edad', 'N/A')
-        gender = 'masculino' if patient_data.get('paciente', {}).get('sexo') == 'm' else 'femenino'
-        
-        # Construir prompt
-        prompt = f"""
-        Eres un especialista en nefrología y medicina interna con 20 años de experiencia.
-        Genera un informe médico completo para el siguiente paciente:
-        
-        DATOS DEL PACIENTE:
-        - Nombre: {name}
-        - Edad: {age} años
-        - Sexo: {gender}
-        
-        VALORACIÓN RENAL:
-        - TFG calculada: {patient_data.get('valores', {}).get('tfg', 'N/A')} ml/min
-        - Etapa ERC: {patient_data.get('valores', {}).get('etapa_erc', 'N/A').upper()}
-        
-        Genera un informe médico estructurado con los siguientes apartados:
-        1. Evaluación clínica
-        2. Análisis de función renal
-        3. Plan terapéutico
-        4. Recomendaciones
-        5. Plan de seguimiento
-        
-        El informe debe ser claro, profesional y usar terminología médica apropiada.
-        """
-        
-        return prompt
-        """Genera un informe simulado cuando no se puede usar la API."""
-        name = patient_data.get('paciente', {}).get('nombre', 'Paciente')
-        age = patient_data.get('paciente', {}).get('edad', 'N/A')
-        gender = 'masculino' if patient_data.get('paciente', {}).get('sexo') == 'm' else 'femenino'
-        tfg = patient_data.get('valores', {}).get('tfg', 'N/A')
-        etapa_erc = patient_data.get('valores', {}).get('etapa_erc', 'N/A').upper()
-        
-        # Informe simulado basado en plantilla
-        return f"""
-        # INFORME MÉDICO
-        
-        ## 1. EVALUACIÓN CLÍNICA
-        
-        Paciente {name} de {age} años de edad, {gender}, quien acude a valoración nefrológica. 
-        
-        ## 2. ANÁLISIS DE FUNCIÓN RENAL
-        
-        Se calcula una Tasa de Filtración Glomerular (TFG) de {tfg} ml/min, 
-        compatible con Enfermedad Renal Crónica estadio {etapa_erc}.
-        
-        ## 3. PLAN TERAPÉUTICO
-        
-        Se recomienda:
-        - Control estricto de presión arterial
-        - Dieta baja en sodio
-        - Evitar nefrotóxicos
-        
-        ## 4. RECOMENDACIONES
-        
-        - Vigilar signos de alarma: edema, oliguria, hematuria
-        - Control estricto de factores de riesgo cardiovascular
-        
-        ## 5. PLAN DE SEGUIMIENTO
-        
-        Se programa control en 3 meses con laboratorios previos.
-        
-        Fecha del informe: {datetime.now().strftime("%d/%m/%Y")}
-        """
-    
-    def _generate_fallback_report(self, patient_data):
-        """Genera un informe de respaldo cuando hay errores."""
-        return "No se pudo generar el informe. Por favor, inténtelo de nuevo más tarde."
+            logger.exception("Error extracting lab values", error=str(e))
+            return {
+                "lab_data": {},
+                "status": "error", 
+                "error": str(e)
+            }

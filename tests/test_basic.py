@@ -4,7 +4,11 @@ from app import create_app
 class TestConfig:
     TESTING = True
     SECRET_KEY = 'test-key'
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     
+    @staticmethod
+    def init_app(app):
+        pass
 
 class BasicTestCase(unittest.TestCase):
     def setUp(self):
