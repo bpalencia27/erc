@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title|default('ERC Insight - Plataforma de Análisis Clínico Inteligente') }}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fuentes e iconos -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Scripts para PDF y gráficos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+    <!-- CSS personalizado -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --bg-panel: #ffffff;
+            --bg-panel-alt: #f1f5f9;
+            --primary: #364FC7;
+            --primary-light: #4C6EF5;
+            --text-main: #1e293b;
+            --text-subtle: #475569;
+            --border-color: #e2e8f0;
+            --risk-low: #22c55e;
+            --risk-moderate: #f59e0b;
+            --risk-high: #ef4444;
+            --risk-very-high: #b91c1c;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Más estilos del template original... */
+    </style>
+    
+    {% block styles %}{% endblock %}
+</head>
+<body class="text-text-main">
+    <!-- Navbar adaptada a la estructura de Flask -->
+    <nav class="bg-primary text-white shadow-md">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <a href="{{ url_for('main.index') }}" class="text-xl font-bold">ERC Insight</a>
+                <div class="hidden lg:flex space-x-6">
+                    <a href="{{ url_for('main.index') }}" class="hover:text-gray-200">Inicio</a>
+                    <a href="{{ url_for('patient.index') }}" class="hover:text-gray-200">Pacientes</a>
+                    <a href="{{ url_for('upload.upload_form') }}" class="hover:text-gray-200">Cargar Documento</a>
+                </div>
+                <button id="mobile-menu-btn" class="lg:hidden">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Menú móvil -->
+    <div id="mobile-menu" class="hidden lg:hidden bg-white shadow-lg absolute w-full z-50">
+        <div class="container mx-auto px-4 py-2">
+            <a href="{{ url_for('main.index') }}" class="block py-2 border-b">Inicio</a>
+            <a href="{{ url_for('patient.index') }}" class="block py-2 border-b">Pacientes</a>
+            <a href="{{ url_for('upload.upload_form') }}" class="block py-2">Cargar Documento</a>
+        </div>
+    </div>
+
+    <!-- Mensajes Flash -->
+    <div class="container mx-auto px-4 mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-4 mb-4 rounded-lg {% if category == 'success' %}bg-green-100 text-green-800{% elif category == 'danger' %}bg-red-100 text-red-800{% elif category == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Contenido principal -->
+    {% block content %}{% endblock %}
+
+    <!-- Footer -->
+    <footer class="mt-12 py-6 bg-gray-100">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-600">ERC Insight &copy; 2025</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // Menú móvil
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
