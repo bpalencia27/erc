@@ -22,7 +22,14 @@ def calcular_tfg(edad, peso, creatinina, sexo):
     if edad <= 0 or peso <= 0:
         return 0.0
 
-    factor_sexo = 0.85 if sexo.lower() == "f" else 1.0
+    # Normalizar sexo
+    sexo_norm = sexo.lower().strip()
+    if sexo_norm in ['f', 'femenino', 'mujer', 'female']:
+        factor_sexo = 0.85
+    else:
+        factor_sexo = 1.0
+    
+    # Fórmula de Cockcroft-Gault mejorada
     tfg = ((140 - edad) * peso * factor_sexo) / (72 * creatinina)
     return round(tfg, 2)
 
@@ -34,14 +41,14 @@ def determinar_etapa_erc(tfg):
         tfg (float): TFG en ml/min/1.73m²
         
     Returns:
-        str: Código de etapa ('g1', 'g2', 'g3a', 'g3b', 'g4', 'g5')
+        str: Código de etapa ('G1', 'G2', 'G3a', 'G3b', 'G4', 'G5')
     """
-    if tfg >= 90: return "g1"
-    if tfg >= 60: return "g2"
-    if tfg >= 45: return "g3a"
-    if tfg >= 30: return "g3b"
-    if tfg >= 15: return "g4"
-    return "g5"
+    if tfg >= 90: return "G1"
+    if tfg >= 60: return "G2"
+    if tfg >= 45: return "G3a"
+    if tfg >= 30: return "G3b"
+    if tfg >= 15: return "G4"
+    return "G5"
 
 def clasificar_riesgo_cv(paciente, tfg):
     """

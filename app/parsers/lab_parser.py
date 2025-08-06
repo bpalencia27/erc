@@ -35,13 +35,15 @@ class AdvancedLabParser:
             # CREATININA - CRÍTICO: Solo capturar de suero/sérica
             'renal_critical': {
                 'creatinina_serica': [
-                    # Patrones específicos para creatinina en suero
-                    r'creatinina\s+(?:en\s+)?(?:suero|sérica|serica|plasma)[:\s]+(\d+[.,]?\d*)\s*(?:mg/dl|mg/dL)',
-                    r'creatinina\s+sérica[:\s]+(\d+[.,]?\d*)',
-                    r'creatinina[:\s]+(\d+[.,]?\d*)\s*mg/dl(?!\s*(?:en\s+)?orina)',
-                    r'CREATININA\s+SERICA[:\s]+(\d+[.,]?\d*)',
-                    # Evitar falsos positivos
-                    r'(?<!orina\s)(?<!urinaria\s)creatinina[:\s]+(\d+[.,]?\d*)\s*mg/dl'
+                    # Patrones específicos y seguros para creatinina en suero
+                    r'creatinina\s+(?:en\s+)?(?:suero|sérica|serica|plasma)[:\s]*(\d+[.,]?\d*)\s*(?:mg/dl|mg/dL)',
+                    r'creatinina\s+sérica[:\s]*(\d+[.,]?\d*)',
+                    r'CREATININA\s+SERICA[:\s]*(\d+[.,]?\d*)',
+                    r'creatinina\s+sangre[:\s]*(\d+[.,]?\d*)',
+                    # Patrón muy específico que evita orina
+                    r'(?<!orina\s)(?<!urinaria\s)(?<!micción\s)creatinina[:\s]*(\d+[.,]?\d*)\s*mg/dl(?!\s*(?:en\s+)?(?:orina|urinaria))',
+                    # Solo en contexto bioquímico/sérico
+                    r'(?:bioquímica|química\s+sanguínea|perfil\s+renal).*?creatinina[:\s]*(\d+[.,]?\d*)',
                 ],
                 'rac': [
                     # Relación Albúmina/Creatinina en mg/g
@@ -116,7 +118,22 @@ class AdvancedLabParser:
                 r'creatinina\s+(?:en\s+)?orina',
                 r'creatinina\s+urinaria',
                 r'orina.*creatinina',
-                r'creatinina.*orina\s+espont[áa]nea'
+                r'creatinina.*orina\s+espont[áa]nea',
+                r'muestra\s+de\s+orina.*creatinina',
+                r'examen\s+de\s+orina.*creatinina',
+                r'análisis\s+de\s+orina.*creatinina',
+                r'sedimento\s+urinario.*creatinina',
+                r'micción.*creatinina',
+                r'clearance.*creatinina',  # Clearance siempre involucra orina
+            ],
+            # Patrones que indican contexto de suero
+            'creatinina_suero_context': [
+                r'química\s+sanguínea',
+                r'bioquímica\s+(?:clínica|sanguínea)',
+                r'perfil\s+(?:renal|bioquímico)',
+                r'función\s+renal',
+                r'laboratorio\s+(?:clínico|de\s+sangre)',
+                r'panel\s+(?:metabólico|renal)',
             ]
         }
     
@@ -205,7 +222,7 @@ class AdvancedLabParser:
         text = re.sub(r'\s+', ' ', text)
         # Normalizar puntuación
         text = re.sub(r'["""]', '"', text)
-        text = re.sub(r'['']', "'", text)
+        text = re.sub(r"['']", "'", text)
         # Mantener saltos de línea para contexto
         text = re.sub(r'\r\n', '\n', text)
         return text.strip()
@@ -229,22 +246,72 @@ class AdvancedLabParser:
         return False
     
     def _is_creatinine_from_serum(self, text, value):
-        """Verifica que la creatinina sea de suero y no de orina"""
-        # Buscar contexto alrededor del valor
-        value_pattern = re.escape(str(value))
-        context_pattern = rf'.{{0,50}}{value_pattern}.{{0,50}}'
+        """Verifica que la creatinina sea de suero y no de orina - VALIDACIÓN CRÍTICA"""
+        # Buscar contexto alrededor del valor (ampliado a 100 caracteres)
+        value_pattern = re.escape(str(value).replace('.', r'[.,]'))
+        context_pattern = rf'.{{0,100}}creatinina[^0-9]*{value_pattern}.{{0,100}}'
         
-        match = re.search(context_pattern, text, re.IGNORECASE)
+        match = re.search(context_pattern, text, re.IGNORECASE | re.DOTALL)
         if match:
-            context = match.group(0)
-            # Verificar indicadores de orina
-            if any(word in context for word in ['orina', 'urinaria', 'micción', 'espontánea']):
+            context = match.group(0).lower()
+            
+            # PRIMERA VERIFICACIÓN: Exclusión explícita de orina
+            orina_indicators = [
+                'orina', 'urinaria', 'micción', 'espontánea', 'clearance',
+                'depuración', 'diuresis', 'excreción urinaria', 'sedimento',
+                'examen de orina', 'análisis de orina', 'muestra de orina'
+            ]
+            
+            if any(indicator in context for indicator in orina_indicators):
+                logger.warning(f"Creatinina {value} detectada en contexto de orina: {context[:50]}...")
                 return False
-            # Verificar indicadores de suero
-            if any(word in context for word in ['suero', 'sérica', 'plasma', 'sangre']):
+            
+            # SEGUNDA VERIFICACIÓN: Confirmación de suero/plasma
+            suero_indicators = [
+                'suero', 'sérica', 'serica', 'plasma', 'sangre', 'sanguínea',
+                'bioquímica', 'química sanguínea', 'perfil renal', 'función renal',
+                'panel metabólico', 'laboratorio clínico'
+            ]
+            
+            if any(indicator in context for indicator in suero_indicators):
+                logger.info(f"Creatinina {value} confirmada como sérica por contexto: {context[:50]}...")
                 return True
+            
+            # TERCERA VERIFICACIÓN: Verificar que no esté en sección de orina
+            # Buscar hacia atrás en el texto para encontrar encabezados de sección
+            value_position = text.lower().find(f"creatinina")
+            if value_position > 0:
+                preceding_text = text[max(0, value_position-200):value_position].lower()
+                
+                # Buscar encabezados que indiquen sección de orina
+                orina_section_headers = [
+                    'orina', 'uroanálisis', 'examen de orina', 'análisis de orina',
+                    'sedimento urinario', 'muestra de orina', 'parcial de orina'
+                ]
+                
+                # Buscar el último encabezado antes del valor
+                for header in orina_section_headers:
+                    if header in preceding_text:
+                        # Verificar si hay un encabezado de sangre/suero después
+                        suero_headers = ['bioquímica', 'química', 'sangre', 'suero', 'sérica']
+                        header_pos = preceding_text.rfind(header)
+                        text_after_header = preceding_text[header_pos:]
+                        
+                        if not any(sh in text_after_header for sh in suero_headers):
+                            logger.warning(f"Creatinina {value} encontrada en sección de orina")
+                            return False
         
-        # Por defecto, asumir que es de suero si no hay indicadores de orina
+        # CUARTA VERIFICACIÓN: Valor típico de creatinina sérica vs orina
+        try:
+            numeric_value = float(str(value).replace(',', '.'))
+            if numeric_value > 50:  # Valores >50 mg/dL son típicos de orina
+                logger.warning(f"Valor de creatinina sospechosamente alto para suero: {numeric_value}")
+                return False
+        except ValueError:
+            pass
+        
+        # Por defecto, asumir que es de suero si pasó todas las verificaciones
+        logger.info(f"Creatinina {value} aceptada como sérica")
         return True
     
     def _clean_name(self, name):
