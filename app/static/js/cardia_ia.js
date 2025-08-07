@@ -62,8 +62,133 @@ document.addEventListener('DOMContentLoaded', function() {
         labResults: {},
         fileContents: {},
         currentPatient: null,
-        riskLevel: null
+        riskLevel: null,
+        errorLog: []
     };
+    // --- Debounce utility ---
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // --- Feedback visual de loading ---
+    function showLoadingState(element, loading = true) {
+        if (!element) return;
+        if (loading) {
+            element.classList.add('loading');
+            element.innerHTML = '<div class="spinner"></div> Calculando...';
+        } else {
+            element.classList.remove('loading');
+        }
+    }
+
+    // --- Validación robusta de inputs ---
+    const ValidationRules = {
+        creatinina: {
+            min: 0.1,
+            max: 15.0,
+            message: 'Creatinina debe estar entre 0.1 y 15.0 mg/dL'
+        },
+        edad: {
+            min: 18,
+            max: 120,
+            message: 'Edad debe estar entre 18 y 120 años'
+        },
+        peso: {
+            min: 30,
+            max: 300,
+            message: 'Peso debe estar entre 30 y 300 kg'
+        }
+    };
+
+    function validateInput(field, value) {
+        const rule = ValidationRules[field];
+        if (!rule) return { valid: true };
+        const numValue = parseFloat(value);
+        if (isNaN(numValue)) {
+            return { valid: false, message: 'Valor numérico requerido' };
+        }
+        if (numValue < rule.min || numValue > rule.max) {
+            return { valid: false, message: rule.message };
+        }
+        return { valid: true };
+    }
+
+    // --- Accesibilidad: ARIA y feedback de error ---
+    function showFieldError(input, message) {
+        let errorId = input.id + '-error';
+        let errorElem = document.getElementById(errorId);
+        if (!errorElem) {
+            errorElem = document.createElement('div');
+            errorElem.id = errorId;
+            errorElem.className = 'input-error-message text-xs text-red-600 mt-1';
+            input.parentNode.appendChild(errorElem);
+        }
+        errorElem.textContent = message;
+        input.setAttribute('aria-invalid', 'true');
+        input.setAttribute('aria-describedby', errorId);
+    }
+    function clearFieldError(input) {
+        let errorId = input.id + '-error';
+        let errorElem = document.getElementById(errorId);
+        if (errorElem) errorElem.remove();
+        input.setAttribute('aria-invalid', 'false');
+        input.removeAttribute('aria-describedby');
+    }
+
+    // Aplicar validación a campos críticos
+    [creatininaInput, edadInput, pesoInput].forEach(input => {
+        if (input) {
+            input.addEventListener('blur', function() {
+                const validation = validateInput(input.id, input.value);
+                if (!validation.valid) {
+                    showFieldError(input, validation.message);
+                } else {
+                    clearFieldError(input);
+                }
+            });
+        }
+    });
+
+    // --- Tracking de errores globales ---
+    window.addEventListener('error', function(e) {
+        appState.errorLog.push({
+            timestamp: new Date(),
+            error: e.message || e,
+            stack: e.error ? e.error.stack : null,
+            userAgent: navigator.userAgent
+        });
+        if (appState.errorLog.length > 10) {
+            // Enviar a backend si hay muchos errores
+            fetch('/api/log-errors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(appState.errorLog)
+            }).catch(console.error);
+            appState.errorLog = [];
+        }
+    });
+
+    // --- Debounced TFG y riesgo ---
+    const debouncedTFGCalc = debounce(calcularTFG, 300);
+    const debouncedRiskUpdate = debounce(updateRiskAssessment, 500);
+
+    if (creatininaInput) creatininaInput.addEventListener('input', debouncedTFGCalc);
+    if (pesoInput) pesoInput.addEventListener('input', debouncedTFGCalc);
+    if (edadInput) edadInput.addEventListener('input', debouncedTFGCalc);
+    if (sexoInput) sexoInput.addEventListener('change', debouncedTFGCalc);
+    // Actualización de riesgo en tiempo real
+    if (creatininaInput) creatininaInput.addEventListener('input', debouncedRiskUpdate);
+    if (pesoInput) pesoInput.addEventListener('input', debouncedRiskUpdate);
+    if (edadInput) edadInput.addEventListener('input', debouncedRiskUpdate);
+    if (sexoInput) sexoInput.addEventListener('change', debouncedRiskUpdate);
 
     // Inicializar la fecha de hoy en el campo de fecha de creatinina
     const today = new Date();
@@ -301,9 +426,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Mostrar sección de prediálisis si TFG <= 20
             if (tfg <= 20) {
-                predialysisSection.classList.remove('hidden');
+                predialisisSection.classList.remove('hidden');
             } else {
-                predialysisSection.classList.add('hidden');
+                predialisisSection.classList.add('hidden');
             }
             
             // Actualizar evaluación de riesgo
@@ -312,106 +437,79 @@ document.addEventListener('DOMContentLoaded', function() {
             return tfg;
         } else {
             tfgDisplay.value = '';
-            predialysisSection.classList.add('hidden');
+            predialisisSection.classList.add('hidden');
             return null;
         }
     }
 
-    // Actualizar evaluación de riesgo
+    // MEJORA: Sistema de clasificación de riesgo más robusto
+    // Archivo: app/static/js/cardia_ia.js
+
     function updateRiskAssessment() {
-        // Obtener valores del formulario
-        const tfgValue = calcularTFG();
-        const hasDM = dmCheckbox.checked;
-        const hasERC = ercCheckbox.checked;
-        const hasHTA = document.querySelector('input[value="HTA"]').checked;
-        const hasECV = document.getElementById('ecv_establecida').checked;
-        const hasTobacco = document.getElementById('tabaquismo').checked;
+        // Paso 1: Recolección de datos
+        const riskData = collectRiskData();
         
-        let riskLevel = 'INCOMPLETO';
-        let riskColor = 'bg-gray-400';
-        let riskFactors = [];
-        
-        // Verificar si tenemos suficientes datos
-        if (tfgValue !== null) {
-            // Contar factores de riesgo
-            let factorCount = 0;
-            
-            if (hasDM) {
-                factorCount++;
-                riskFactors.push('Diabetes Mellitus');
-            }
-            
-            if (hasERC || tfgValue < 60) {
-                factorCount++;
-                riskFactors.push('Enfermedad Renal Crónica');
-                
-                // Mostrar icono de alerta ERC
-                ercAlertIcon.classList.remove('hidden');
-                ercCheckbox.checked = true;
-            } else {
-                ercAlertIcon.classList.add('hidden');
-            }
-            
-            if (hasHTA) {
-                factorCount++;
-                riskFactors.push('Hipertensión Arterial');
-            }
-            
-            if (hasECV) {
-                factorCount++;
-                riskFactors.push('Enfermedad Cardiovascular Establecida');
-            }
-            
-            if (hasTobacco) {
-                factorCount++;
-                riskFactors.push('Tabaquismo Activo');
-            }
-            
-            // Determinar nivel de riesgo
-            if (factorCount === 0) {
-                riskLevel = 'BAJO';
-                riskColor = 'bg-green-500';
-            } else if (factorCount === 1) {
-                riskLevel = 'MODERADO';
-                riskColor = 'bg-yellow-500';
-            } else if (factorCount === 2) {
-                riskLevel = 'ALTO';
-                riskColor = 'bg-red-500';
-            } else if (factorCount >= 3) {
-                riskLevel = 'MUY ALTO';
-                riskColor = 'bg-red-800';
-            }
-            
-            // Actualizar UI
-            riskLevelIndicator.textContent = riskLevel;
-            riskLevelIndicator.className = `text-center font-extrabold text-3xl py-4 rounded-lg text-white transition-all duration-500 ${riskColor}`;
-            
-            // Actualizar panel de factores de riesgo
-            if (riskFactors.length > 0) {
-                riskFactorsSummary.innerHTML = `
-                    <p class="font-medium">Factores presentes:</p>
-                    <ul class="list-disc pl-5">
-                        ${riskFactors.map(factor => `<li>${factor}</li>`).join('')}
-                    </ul>
-                `;
-            } else {
-                riskFactorsSummary.innerHTML = `<p>Sin factores de riesgo significativos.</p>`;
-            }
-            
-            // Actualizar metas terapéuticas
-            updateTherapeuticGoals(riskLevel, tfgValue, hasDM);
-            
-            // Guardar estado
-            appState.riskLevel = riskLevel;
-        } else {
-            // Datos incompletos
-            riskLevelIndicator.textContent = 'INCOMPLETO';
-            riskLevelIndicator.className = 'text-center font-extrabold text-3xl py-4 rounded-lg text-white transition-all duration-500 bg-gray-400';
-            riskFactorsSummary.innerHTML = '<p>Complete los datos para calcular el riesgo.</p>';
-            goalsPreviewContent.innerHTML = '<p class="text-center text-sm text-gray-400">Los datos de metas aparecerán aquí.</p>';
+        // Paso 2: Validación de datos mínimos
+        if (!validateMinimumData(riskData)) {
+            updateRiskUI('INCOMPLETO', 'bg-gray-400', []);
+            return;
         }
+        
+        // Paso 3: Cálculo de riesgo siguiendo protocolo backend
+        const riskAssessment = calculateRiskLevel(riskData);
+        
+        // Paso 4: Actualización de UI en tiempo real
+        updateRiskUI(riskAssessment.level, riskAssessment.color, riskAssessment.factors);
+        
+        // Paso 5: Actualizar metas terapéuticas
+        updateTherapeuticGoals(riskAssessment.level, riskData.tfg, riskData.hasDM);
+        
+        // Paso 6: Trigger eventos para otros componentes
+        document.dispatchEvent(new CustomEvent('riskUpdated', { detail: riskAssessment }));
     }
 
+    function calculateRiskLevel(data) {
+        const { tfg, hasDM, hasERC, hasHTA, hasECV, hasTobacco, edad, ldl } = data;
+        
+        // PASO 1: MUY ALTO RIESGO
+        if (hasECV || tfg <= 30 || (hasDM && data.danoOrgano) || (hasDM && data.factoresCount >= 3)) {
+            return {
+                level: 'MUY ALTO',
+                color: 'bg-red-800',
+                factors: data.factors,
+                justification: 'Criterios de muy alto riesgo cumplidos'
+            };
+        }
+        
+        // PASO 2: ALTO RIESGO
+        if ((tfg > 30 && tfg <= 60) || data.pa >= 180 || ldl > 190 || data.factoresCount >= 3) {
+            return {
+                level: 'ALTO',
+                color: 'bg-red-500',
+                factors: data.factors,
+                justification: 'Criterios de alto riesgo cumplidos'
+            };
+        }
+        
+        // PASO 3: RIESGO MODERADO
+        if (data.factoresCount >= 1 || data.potenciadoresCount >= 1) {
+            return {
+                level: 'MODERADO',
+                color: 'bg-yellow-500',
+                factors: data.factors,
+                justification: 'Factores de riesgo moderado presentes'
+            };
+        }
+        
+        // PASO 4: BAJO RIESGO
+        return {
+            level: 'BAJO',
+            color: 'bg-green-500',
+            factors: [],
+            justification: 'Sin factores de riesgo significativos'
+        };
+    }
+    
     // Actualizar metas terapéuticas
     function updateTherapeuticGoals(riskLevel, tfg, hasDM) {
         if (!riskLevel || riskLevel === 'INCOMPLETO') {
@@ -1095,10 +1193,562 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Función para mostrar alerta
-    function showAlert(title, message) {
-        alertTitle.textContent = title;
-        alertMessage.textContent = message;
-        alertModal.classList.add('visible');
+    function showAlert(title, message, type = 'info') {
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const closeAlertModal = document.getElementById('close-alert-modal');
+        
+        if (alertModal && alertTitle && alertMessage) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.add('visible');
+            
+            // Múltiples formas de cerrar
+            const closeModal = () => {
+                alertModal.classList.remove('visible');
+                // Limpiar event listeners para evitar memory leaks
+                document.removeEventListener('keydown', handleEscape);
+                alertModal.removeEventListener('click', handleBackdropClick);
+            };
+            
+            // 1. Botón de cerrar
+            if (closeAlertModal) {
+                closeAlertModal.onclick = closeModal;
+            }
+            
+            // 2. Tecla ESC
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') closeModal();
+            };
+            document.addEventListener('keydown', handleEscape);
+            
+            // 3. Click fuera del modal
+            const handleBackdropClick = (e) => {
+                if (e.target === alertModal) closeModal();
+            };
+            alertModal.addEventListener('click', handleBackdropClick);
+            
+            // 4. Auto-cerrar después de 5 segundos para mensajes de éxito
+            if (type === 'success') {
+                setTimeout(closeModal, 5000);
+            }
+            
+            // 5. Agregar botón de cerrar adicional si no existe
+            if (!closeAlertModal) {
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '×';
+                closeBtn.className = 'modal-close-btn';
+                closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; font-size: 24px; background: none; border: none; cursor: pointer;';
+                closeBtn.onclick = closeModal;
+                alertModal.querySelector('.modal-content')?.appendChild(closeBtn);
+            }
+        } else {
+            // Fallback a alert nativo si el modal no existe
+            alert(`${title}\n\n${message}`);
+        }
+    }
+
+    // Event Listeners
+    
+    // Evento de envío del formulario
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Recopilar datos del formulario
+            const formData = new FormData(form);
+            
+            // Construir objeto de datos del paciente
+            const patientData = {
+                nombre: formData.get('nombre'),
+                edad: formData.get('edad'),
+                sexo: formData.get('sexo'),
+                peso: formData.get('peso'),
+                talla: formData.get('talla'),
+                imc: formData.get('imc'),
+                perAbdominal: formData.get('per_abd'),
+                diagnosticos: [],
+                ecvEstablecida: formData.get('ecv_establecida') === 'on',
+                tabaquismo: formData.get('tabaquismo') === 'on',
+                condSocioeconomicas: formData.get('cond_socioeconomicas') === 'on',
+                fragil: formData.get('fragil') === 'on',
+                adherencia: formData.get('adherencia'),
+                barrerasAcceso: formData.get('barreras_acceso') === 'on',
+                creatinina: formData.get('creatinina'),
+                creatininaFecha: formData.get('creatinina_date'),
+                tfg: tfgDisplay.value,
+                riesgoCardiovascular: appState.riskLevel,
+                labResults: appState.labResults,
+                predialisis: document.querySelector('input[name="predialysis_status"]:checked')?.value || null
+            };
+            
+            // Recopilar diagnósticos
+            document.querySelectorAll('input[name="diagnostico"]:checked').forEach(checkbox => {
+                patientData.diagnosticos.push(checkbox.value);
+            });
+            
+            // Duración de DM si aplica
+            if (patientData.diagnosticos.includes('DM')) {
+                patientData.duracionDM = formData.get('duracion_dm');
+            }
+            
+            // Recopilar medicamentos
+            patientData.medicamentos = [];
+            document.querySelectorAll('.med-item').forEach(item => {
+                const nombre = item.querySelector('input[name="med_nombre"]').value;
+                const dosis = item.querySelector('input[name="med_dosis"]').value;
+                const frecuencia = item.querySelector('input[name="med_frecuencia"]').value;
+                
+                if (nombre) {
+                    patientData.medicamentos.push({ nombre, dosis, frecuencia });
+                }
+            });
+            
+            // Recopilar presión arterial
+            patientData.presionArterial = [];
+            document.querySelectorAll('.pa-item').forEach(item => {
+                const sistolica = item.querySelector('input[name="pa_sistolica"]').value;
+                const diastolica = item.querySelector('input[name="pa_diastolica"]').value;
+                const fecha = item.querySelector('input[name="pa_fecha"]').value;
+                
+                if (sistolica && diastolica) {
+                    patientData.presionArterial.push({ sistolica, diastolica, fecha });
+                }
+            });
+            
+            console.log('Datos del paciente:', patientData);
+            
+            // Generar informe
+            generateReportWithAI(patientData);
+        });
+    }
+    
+    // Evento para añadir medición de presión arterial
+    if (addPaBtn) {
+        addPaBtn.addEventListener('click', function() {
+            addPresionArterial();
+        });
+    }
+    
+    // Evento para añadir medicamento
+    if (addMedicamentoBtn) {
+        addMedicamentoBtn.addEventListener('click', function() {
+            addMedicamento();
+        });
+    }
+    
+    // Eventos para botones de medicamentos rápidos
+    if (quickMedBtns.length > 0) {
+        quickMedBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const med = this.dataset.med;
+                const dosis = this.dataset.dosis;
+                const freq = this.dataset.freq;
+                addMedicamento(med, dosis, freq);
+            });
+        });
+    }
+    
+    // Eventos para calcular IMC
+    if (pesoInput && tallaInput) {
+        pesoInput.addEventListener('input', calcularIMC);
+        tallaInput.addEventListener('input', calcularIMC);
+    }
+    
+    // Eventos para calcular TFG
+    if (creatininaInput) {
+        creatininaInput.addEventListener('input', calcularTFG);
+        sexoInput.addEventListener('change', calcularTFG);
+        edadInput.addEventListener('input', calcularTFG);
+        pesoInput.addEventListener('input', calcularTFG);
+    }
+    
+    // Evento para mostrar/ocultar duración DM
+    if (dmCheckbox) {
+        dmCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                duracionDmContainer.classList.remove('hidden');
+            } else {
+                duracionDmContainer.classList.add('hidden');
+            }
+            updateRiskAssessment();
+        });
+    }
+    
+    // Evento para ERC checkbox
+    if (ercCheckbox) {
+        ercCheckbox.addEventListener('change', updateRiskAssessment);
+    }
+    
+    // Eventos para diagnósticos y condiciones
+    document.querySelectorAll('input[name="diagnostico"], #ecv_establecida, #tabaquismo').forEach(checkbox => {
+        checkbox.addEventListener('change', updateRiskAssessment);
+    });
+    
+    // Evento para toggle manual de laboratorios
+    if (manualLabToggle) {
+        manualLabToggle.addEventListener('change', function() {
+            if (this.checked) {
+                manualLabInputs.classList.remove('hidden');
+                labUploadContainer.classList.add('hidden');
+            } else {
+                manualLabInputs.classList.add('hidden');
+                labUploadContainer.classList.remove('hidden');
+            }
+        });
+    }
+    
+    // Evento para upload de archivos
+    if (fileUpload) {
+        fileUpload.addEventListener('change', function(e) {
+            processLabFiles(e.target.files);
+        });
+        
+        // Drag and drop
+        const dropArea = document.querySelector('.file-drop-area');
+        if (dropArea) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, function() {
+                    this.classList.add('active');
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, function() {
+                    this.classList.remove('active');
+                }, false);
+            });
+            
+            dropArea.addEventListener('drop', function(e) {
+                const files = e.dataTransfer.files;
+                processLabFiles(files);
+            }, false);
+        }
+    }
+    
+    // Evento para evaluar fragilidad
+    if (evalFragilidadBtn) {
+        evalFragilidadBtn.addEventListener('click', function() {
+            fragilityModal.classList.add('visible');
+        });
+    }
+    
+    // Eventos para modal de fragilidad
+    if (closeFragilityModal) {
+        closeFragilityModal.addEventListener('click', function() {
+            fragilityModal.classList.remove('visible');
+        });
+        
+        document.querySelectorAll('#fried-criteria input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const checkedCount = document.querySelectorAll('#fried-criteria input[type="checkbox"]:checked').length;
+                const isFragile = checkedCount >= 3;
+                
+                frailtyStatus.textContent = isFragile ? 'Frágil' : 'No Frágil';
+                frailtyMarker.style.left = `${(checkedCount / 5) * 100}%`;
+                
+                // Actualizar checkbox en el formulario principal
+                fragilCheckbox.checked = isFragile;
+                fragilCheckbox.disabled = true;
+            });
+        });
+    }
+    
+    // Eventos para modales
+    if (closeAlertModal) {
+        closeAlertModal.addEventListener('click', function() {
+            alertModal.classList.remove('visible');
+        });
+    }
+    
+    // Eventos para historial
+    if (openHistoryBtn) {
+        openHistoryBtn.addEventListener('click', function() {
+            historyModal.classList.add('visible');
+        });
+    }
+    
+    if (closeHistoryModal) {
+        closeHistoryModal.addEventListener('click', function() {
+            historyModal.classList.remove('visible');
+        });
+    }
+    
+    // Eventos para imprimir/copiar informe
+    if (printReportBtn) {
+        printReportBtn.addEventListener('click', function() {
+            window.print();
+        });
+    }
+    
+    if (copyReportBtn) {
+        copyReportBtn.addEventListener('click', function() {
+            const reportText = reportOutput.textContent;
+            navigator.clipboard.writeText(reportText)
+                .then(() => {
+                    // Mostrar feedback
+                    this.innerHTML = '<i class="fas fa-check"></i>';
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="fas fa-copy"></i>';
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Error copying text: ', err);
+                    showAlert('Error', 'No se pudo copiar el texto al portapapeles.');
+                });
+        });
+    }
+    
+    // Toggle de alto contraste
+    if (highContrastToggle) {
+        highContrastToggle.addEventListener('click', function() {
+            document.body.classList.toggle('high-contrast');
+            appState.highContrast = document.body.classList.contains('high-contrast');
+            
+            // Guardar preferencia
+            localStorage.setItem('highContrast', appState.highContrast);
+        });
+        
+        // Cargar preferencia guardada
+        const savedHighContrast = localStorage.getItem('highContrast');
+        if (savedHighContrast === 'true') {
+            document.body.classList.add('high-contrast');
+            appState.highContrast = true;
+        }
+    }
+    
+    // Inicialización
+    loadPatientHistory();
+    
+    // Añadir campo inicial de presión arterial si no hay ninguno
+    if (paContainer && paContainer.children.length === 0) {
+        addPresionArterial();
+    }
+    
+    // Crear campos para entrada manual de laboratorios
+    if (manualLabInputs) {
+        const commonLabTests = [
+            { name: 'glucosa', label: 'Glucosa', unit: 'mg/dL' },
+            { name: 'urea', label: 'Urea', unit: 'mg/dL' },
+            { name: 'colesterol', label: 'Colesterol Total', unit: 'mg/dL' },
+            { name: 'ldl', label: 'LDL-c', unit: 'mg/dL' },
+            { name: 'hdl', label: 'HDL-c', unit: 'mg/dL' },
+            { name: 'trigliceridos', label: 'Triglicéridos', unit: 'mg/dL' },
+            { name: 'hba1c', label: 'HbA1c', unit: '%' },
+            { name: 'potasio', label: 'Potasio', unit: 'mEq/L' },
+            { name: 'sodio', label: 'Sodio', unit: 'mEq/L' },
+            { name: 'calcio', label: 'Calcio', unit: 'mg/dL' },
+            { name: 'fosforo', label: 'Fósforo', unit: 'mg/dL' },
+            { name: 'albumina', label: 'Albúmina', unit: 'g/dL' }
+        ];
+        
+        let labInputsHTML = '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">';
+        
+        commonLabTests.forEach(test => {
+            labInputsHTML += `
+                <div>
+                    <label for="${test.name}" class="font-medium text-sm mb-1 block">${test.label}</label>
+                    <div class="flex">
+                        <input type="number" id="${test.name}" name="${test.name}" step="0.01" class="input-field">
+                        <span class="ml-2 text-sm text-gray-500 flex items-center">${test.unit}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        labInputsHTML += '</div>';
+        manualLabInputs.innerHTML = labInputsHTML;
+        
+        // Añadir event listeners para actualizar el estado
+        document.querySelectorAll('#manual-lab-inputs input').forEach(input => {
+            input.addEventListener('change', function() {
+                if (this.value) {
+                    appState.labResults[this.name] = {
+                        value: this.value,
+                        unit: commonLabTests.find(test => test.name === this.name)?.unit || ''
+                    };
+                }
+            });
+        });
+    }
+    
+    // PROBLEMA IDENTIFICADO: Extracción incorrecta del nombre y sexo
+    // Archivo: app/static/js/cardia_ia.js, línea ~840
+
+    // SOLUCIÓN REFACTORIZADA:
+    function extractPatientDataFromText(text) {
+        const patientData = {};
+        
+        // Mejorar extracción del nombre - eliminar roles/títulos profesionales
+        const namePatterns = [
+            /(?:paciente|nombre):\s*([A-ZÁÉÍÓÚÑ\s]+?)(?:\s+(?:médico|doctor|dr|dra|enfermero|enfermera|lic|ing|abogado|contador))?(?:\s+(?:edad|sexo|fecha)|$)/i,
+            /^([A-ZÁÉÍÓÚÑ\s]+?)(?:\s+(?:médico|doctor|dr|dra|enfermero|enfermera|lic|ing|abogado|contador))?(?:\s+(?:edad|sexo|fecha))/i
+        ];
+        
+        for (const pattern of namePatterns) {
+            const match = text.match(pattern);
+            if (match) {
+                patientData.nombre = match[1].trim()
+                    .replace(/\s+/g, ' ')
+                    .replace(/\s*(médico|doctor|dr|dra|enfermero|enfermera|lic|ing|abogado|contador)\s*$/i, '');
+                break;
+            }
+        }
+        
+        // Detección inteligente de sexo basada en el nombre
+        const detectSexFromName = (name) => {
+            if (!name) return null;
+            
+            const femaleEndings = ['a', 'e', 'í', 'is', 'iz', 'th'];
+            const femaleNames = ['ana', 'sofia', 'maria', 'carmen', 'isabel', 'luz', 'flor', 'beatriz'];
+            const maleNames = ['juan', 'pedro', 'carlos', 'luis', 'jose', 'miguel', 'diego'];
+            
+            const nameLower = name.toLowerCase();
+            const firstName = nameLower.split(' ')[0];
+            
+            // Verificar nombres conocidos
+            if (femaleNames.some(fn => firstName.includes(fn))) return 'f';
+            if (maleNames.some(mn => firstName.includes(mn))) return 'm';
+            
+            // Verificar terminaciones típicas
+            if (femaleEndings.some(ending => firstName.endsWith(ending))) return 'f';
+            
+            // Por defecto, buscar en el texto
+            return null;
+        };
+        
+        // Buscar sexo explícito en el texto
+        const sexMatch = text.match(/(?:sexo|género):\s*(masculino|femenino|hombre|mujer|m|f)/i);
+        if (sexMatch) {
+            const sexValue = sexMatch[1].toLowerCase();
+            patientData.sexo = (sexValue === 'masculino' || sexValue === 'hombre' || sexValue === 'm') ? 'm' : 'f';
+        } else if (patientData.nombre) {
+            // Si no se encuentra explícitamente, intentar detectar por el nombre
+            patientData.sexo = detectSexFromName(patientData.nombre) || 'f'; // Default a femenino si no se puede determinar
+        }
+        
+        return patientData;
+    }
+    
+    // SOLUCIÓN: Diferenciar estrictamente entre tipos de creatinina
+    // Archivo: app/static/js/cardia_ia.js
+
+    function extractLabResultsWithRegex(text) {
+        const results = {};
+        const labPatterns = [
+            // CREATININA SÉRICA (SANGUÍNEA) - SOLO ESTA SE USA PARA TFG
+            { 
+                name: 'creatinina_serica', 
+                regex: /creatinina(?:\s+en)?\s+(?:sérica|sangre|plasma|sanguínea):?\s*([\d.,]+)\s*(mg\/dL|mg\/dl)/i, 
+                unit: 'mg/dL',
+                type: 'serica'
+            },
+            { 
+                name: 'creatinina_serica', 
+                regex: /creatinina(?!\s+(?:en\s+)?orina):?\s*([\d.,]+)\s*(mg\/dL|mg\/dl)/i, 
+                unit: 'mg/dL',
+                type: 'serica'
+            },
+            
+            // CREATININA EN ORINA - NO USAR PARA TFG
+            { 
+                name: 'creatinina_orina', 
+                regex: /creatinina\s+(?:en\s+)?orina(?:\s+espontánea)?:?\s*([\d.,]+)\s*(mg\/dL|mg\/dl|g\/L)/i, 
+                unit: 'mg/dL',
+                type: 'orina'
+            },
+            
+            // Otros laboratorios...
+        ];
+        
+        // Procesar cada patrón
+        labPatterns.forEach(pattern => {
+            const match = text.match(pattern.regex);
+            if (match) {
+                const value = parseFloat(match[1].replace(',', '.'));
+                
+                // IMPORTANTE: Solo asignar creatinina para TFG si es sérica
+                if (pattern.name.includes('creatinina')) {
+                    if (pattern.type === 'serica') {
+                        results['creatinina'] = { value, unit: pattern.unit };
+                    } else if (pattern.type === 'orina') {
+                        results['creatinina_orina'] = { value, unit: pattern.unit };
+                        // NO asignar a 'creatinina' general
+                    }
+                } else {
+                    results[pattern.name] = { value, unit: pattern.unit };
+                }
+            }
+        });
+        
+        return results;
+    }
+
+    // SOLUCIÓN: Mejorar el sistema de alertas y modales
+    // Archivo: app/static/js/cardia_ia.js
+
+    function showAlert(title, message, type = 'info') {
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const closeAlertModal = document.getElementById('close-alert-modal');
+        
+        if (alertModal && alertTitle && alertMessage) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.add('visible');
+            
+            // Múltiples formas de cerrar
+            const closeModal = () => {
+                alertModal.classList.remove('visible');
+                // Limpiar event listeners para evitar memory leaks
+                document.removeEventListener('keydown', handleEscape);
+                alertModal.removeEventListener('click', handleBackdropClick);
+            };
+            
+            // 1. Botón de cerrar
+            if (closeAlertModal) {
+                closeAlertModal.onclick = closeModal;
+            }
+            
+            // 2. Tecla ESC
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') closeModal();
+            };
+            document.addEventListener('keydown', handleEscape);
+            
+            // 3. Click fuera del modal
+            const handleBackdropClick = (e) => {
+                if (e.target === alertModal) closeModal();
+            };
+            alertModal.addEventListener('click', handleBackdropClick);
+            
+            // 4. Auto-cerrar después de 5 segundos para mensajes de éxito
+            if (type === 'success') {
+                setTimeout(closeModal, 5000);
+            }
+            
+            // 5. Agregar botón de cerrar adicional si no existe
+            if (!closeAlertModal) {
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '×';
+                closeBtn.className = 'modal-close-btn';
+                closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; font-size: 24px; background: none; border: none; cursor: pointer;';
+                closeBtn.onclick = closeModal;
+                alertModal.querySelector('.modal-content')?.appendChild(closeBtn);
+            }
+        } else {
+            // Fallback a alert nativo si el modal no existe
+            alert(`${title}\n\n${message}`);
+        }
     }
 
     // Event Listeners
