@@ -2,6 +2,7 @@ services:
   - type: web
     name: erc-insight
     env: python
+<<<<<<< HEAD
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn wsgi:app
     envVars:
@@ -22,3 +23,29 @@ databases:
   - name: erc-database
     databaseName: erc_database
     plan: free
+=======
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:application
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: wsgi.py
+      - key: DATABASE_URL
+        fromDatabase:
+          name: erc-postgres
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false
+  - type: pserv
+    name: erc-postgres
+    env: postgresql
+    region: oregon
+    plan: starter
+    databaseName: erc_insight
+    user: erc_user
+>>>>>>> 1a009ef5 ( Preparación completa para despliegue en Render.com)

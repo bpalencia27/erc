@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -60,3 +61,53 @@ Thumbs.db
 .~*
 *.swp
 *.swo
+=======
+# ERC Insight - Deployment Cleanup
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.log
+logs/
+instance/
+*.egg-info/
+.pytest_cache/
+.coverage
+uploads/*
+temp/
+*.zip
+RCV IA/
+**/venv/
+**/site-packages/
+**/Lib/
+**/Scripts/
+**/Include/
+**/*.backup
+**/*.bak
+**/temp
+*.tmp
+**/*~
+**/.DS_Store
+**/*.swp
+# Archivos duplicados
+**/*_backup.*
+**/* (1).*
+# Archivos de configuración específicos
+wsgi.py - Configuración WSGI optimizad*
+# Archivos temporales de zip
+*.zip
+ercp.zip
+erc.zip
+# Archivos de ejemplo
+ejemplo_*
+test_output.py
+hello*.py
+minimal_flask.py
+simple_flask.py
+run_*.py
+migrations.py
+# Archivos README duplicados
+README_new.md
+>>>>>>> 1a009ef5 ( Preparación completa para despliegue en Render.com)
