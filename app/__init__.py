@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from flask import Flask
 from flask_cors import CORS
 from config import config
@@ -17,78 +18,56 @@ def create_app(config_name='default'):
         app.config.from_object(config_name)
         
     # Inicializar la configuración
-    config[config_name].init_app(app)
+    try:
+        from app.report import bp as report_bp
+        app.register_blueprint(report_bp, url_prefix='/report')
+        # logger se define más abajo
+        pass
+    except ImportError as e:
+        pass
     
-    # Inicializar extensiones
-    CORS(app)
-    db.init_app(app)
-    migrate.init_app(app, db)
+    try:
+        from app.upload import bp as upload_bp
+        app.register_blueprint(upload_bp, url_prefix='/upload')
+        pass
+    except ImportError as e:
+        pass
     
-    # Configurar logging
-    setup_logging(app, config_name)
+    # Manejadores de error
+    @app.errorhandler(404)
+    def not_found_error(error):
+        from flask import render_template
+        return render_template('errors/404.html'), 404
     
-    # Registrar blueprints
-    register_blueprints(app)
+    @app.errorhandler(500)
+    def internal_error(error):
+        from flask import render_template
+        import logging
+        logging.error(f"Error interno del servidor: {error}")
+        return render_template('errors/500.html'), 500
     
-    # Registrar comandos CLI
-    from app.commands import register_commands
-    register_commands(app)
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            return e
+        import logging
+        from flask import render_template
+        logging.error(f"Error no controlado: {e}", exc_info=True)
+        return render_template('errors/500.html'), 500
+    
+    # Contexto de template global
+    @app.context_processor
+    def inject_debug():
+        return dict(debug=app.debug)
+    
+    # Ruta de salud
+    @app.route('/health')
+    def health_check():
+        return {'status': 'healthy', 'version': '2.0.0'}, 200
+    
+    import logging
+    logging.info(f"Aplicación Flask creada exitosamente - config: {config_name}, debug: {app.debug}")
     
     return app
 
-def setup_logging(app, config_name):
-    """Configura el sistema de logging para la aplicación."""
-    # Crear directorio de logs con ruta absoluta
-    logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
-    
-    # Configurar logging basado en el entorno
-    if config_name == 'production':
-        # En producción, la clase ProductionConfig ya configura el handler de stdout
-        pass
-    else:
-        # En desarrollo, configurar logging a archivo
-        file_handler = RotatingFileHandler(
-            os.path.join(logs_dir, 'erc_insight.log'), 
-            maxBytes=10240, 
-            backupCount=10
-        )
-        file_handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-        ))
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
-        
-    app.logger.setLevel(logging.INFO)
-    app.logger.info('ERC Insight startup')
-
-def register_blueprints(app):
-    """Registra todos los blueprints de la aplicación."""
-    from app.main import bp as main_bp
-    app.register_blueprint(main_bp)
-    
-    from app.api import bp as api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
-    
-    from app.upload import bp as upload_bp
-    app.register_blueprint(upload_bp, url_prefix='/upload')
-    
-    from app.patient import bp as patient_bp
-    app.register_blueprint(patient_bp, url_prefix='/patient')
-    
-    from app.report import bp as report_bp
-    app.register_blueprint(report_bp, url_prefix='/report')
-    
-    # Añadir otros blueprints según sea necesario
-    try:
-        from app.auth import bp as auth_bp
-        app.register_blueprint(auth_bp, url_prefix='/auth')
-    except ImportError:
-        app.logger.warning("Blueprint 'auth' no encontrado o no configurado correctamente.")
-
-UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(__file__), 'static', 'uploads'))
-REPORT_FOLDER = os.environ.get('REPORT_FOLDER', os.path.join(os.path.dirname(__file__), 'static', 'reports'))
-
-# Esta parte es redundante ya que lo manejamos en Config.init_app
-# Las carpetas se crearán cuando se inicialice la aplicación

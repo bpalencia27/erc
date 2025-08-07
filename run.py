@@ -68,6 +68,19 @@ def main():
         logger.info(f"Iniciando ERC Insight en modo {config_name}")
         logger.info(f"Puerto: {port}, Debug: {debug}")
         
+        print(f"""
+        ╔══════════════════════════════════════════╗
+        ║         ERC Insight - v2.0.0            ║
+        ║     Sistema de Análisis Renal con IA    ║
+        ╠══════════════════════════════════════════╣
+        ║  Servidor: http://localhost:{port:<5}       ║
+        ║  Entorno: {config_name:<15}           ║
+        ║  Debug: {str(debug):<5}                    ║
+        ╚══════════════════════════════════════════╝
+        
+        Presiona CTRL+C para detener el servidor
+        """)
+        
         # Ejecutar aplicación
         app.run(
             host='0.0.0.0' if config_name == 'production' else '127.0.0.1',
@@ -78,51 +91,14 @@ def main():
         
     except ImportError as e:
         logger.error(f"Error al importar módulos: {str(e)}")
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Error al ejecutar la aplicación: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    main()
-        port = int(os.getenv('PORT', 5000))
-        
-        # Información de inicio
-        logger.info(
-            f"🚀 Iniciando ERC Insight - Configuración: {config_name}, Puerto: {port}, Debug: {app.debug}"
-        )
-        
-        print(f"""
-        ╔══════════════════════════════════════════╗
-        ║         ERC Insight - v2.0.0            ║
-        ║     Sistema de Análisis Renal con IA    ║
-        ╠══════════════════════════════════════════╣
-        ║  Servidor: http://localhost:{port:<5}       ║
-        ║  Entorno: {config_name:<15}           ║
-        ║  Debug: {str(app.debug):<5}                    ║
-        ╚══════════════════════════════════════════╝
-        
-        Presiona CTRL+C para detener el servidor
-        """)
-        
-        # Ejecutar servidor
-        app.run(
-            host='0.0.0.0',
-            port=port,
-            debug=app.debug,
-            use_reloader=True
-        )
-        
-    except ImportError as e:
-        logger.error(f"Error importando módulos: {e}")
         print(f"❌ Error: {e}")
         print("Ejecuta: pip install -r requirements.txt")
         sys.exit(1)
     except Exception as e:
-        logger.error(f"Error iniciando aplicación: {e}", exc_info=True)
+        logger.error(f"Error al ejecutar la aplicación: {str(e)}", exc_info=True)
         print(f"❌ Error fatal: {e}")
         sys.exit(1)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 >>>>>>> 1a009ef5 ( Preparación completa para despliegue en Render.com)
