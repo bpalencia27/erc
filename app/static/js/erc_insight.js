@@ -1133,5 +1133,6 @@ document.addEventListener('DOMContentLoaded', () => {
         callBackend('save_report', {
             patient_id: patientData.numero_documento || "sin_id",
             patient_name: patientData.nombre,
-            report_content: reportContent,
-            report_data: patient
+                report_content: reportContent,
+                report_data: patientData
+            });
