@@ -1,73 +1,123 @@
-<<<<<<< HEAD
-from flask import Flask
-from flask_cors import CORS
-from config import config
+"""
+Aplicación Flask para ERC Insight
+"""
 import os
-from logging.handlers import RotatingFileHandler
 import logging
-from app.extensions import db, migrate
+from pathlib import Path
+from flask import Flask, render_template
+from flask_cors import CORS
+from flask_caching import Cache
+from werkzeug.exceptions import HTTPException
+from logging.handlers import RotatingFileHandler
 
-def create_app(config_name='default'):
-    """Crea y configura la aplicación Flask."""
+# Importar extensiones si existen
+try:
+    from app.extensions import db, migrate
+    HAS_DB = True
+except ImportError:
+    HAS_DB = False
+
+def create_app(config_name='development'):
+    """Crea y configura la aplicación Flask.
+
+    Acepta ya sea un nombre de configuración (str) o una clase/objeto
+    con atributos de configuración (por ejemplo, usado en tests).
+    """
     app = Flask(__name__)
-    
+
     # Cargar configuración
     if isinstance(config_name, str):
-        app.config.from_object(config[config_name])
+        from config import config as CONFIG_MAP
+        cfg = CONFIG_MAP.get(config_name, CONFIG_MAP.get('default'))
+        app.config.from_object(cfg)
+        # Inicializar la configuración si el objeto tiene init_app
+        if hasattr(cfg, 'init_app'):
+            cfg.init_app(app)
     else:
+        # Se asume que es una clase u objeto de configuración (tests)
         app.config.from_object(config_name)
-        
-    # Inicializar la configuración
-    try:
-        from app.report import bp as report_bp
-        app.register_blueprint(report_bp, url_prefix='/report')
-        # logger se define más abajo
-        pass
-    except ImportError as e:
-        pass
+        if hasattr(config_name, 'init_app'):
+            config_name.init_app(app)
     
-    try:
-        from app.upload import bp as upload_bp
-        app.register_blueprint(upload_bp, url_prefix='/upload')
-        pass
-    except ImportError as e:
-        pass
+    # Inicializar CORS
+    CORS(app, resources={r"/*": {"origins": "*"}})
     
-    # Manejadores de error
+    # Inicializar Cache
+    cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+    
+    # Inicializar base de datos si está disponible
+    if HAS_DB:
+        # Solo inicializar DB si hay URI definida o si no estamos en testing sin configuración
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+        if db_uri:
+            db.init_app(app)
+            migrate.init_app(app, db)
+        else:
+            app.logger.debug('Omitiendo inicialización de DB: falta SQLALCHEMY_DATABASE_URI')
+    
+    # Registrar blueprints
+    register_blueprints(app)
+    
+    # Registrar manejadores de error
+    register_error_handlers(app)
+    
+    # Configurar logging
+    if not app.debug and not app.testing:
+        configure_logging(app)
+    
+    return app
+
+def register_blueprints(app):
+    """Registra todos los blueprints de la aplicación."""
+    blueprints = [
+        ('app.main', 'main', '/'),
+        ('app.api', 'api', '/api'),
+        ('app.report', 'report', '/report'),
+        ('app.upload', 'upload', '/upload'),
+        ('app.patient', 'patient', '/patient')
+    ]
+    
+    for module_name, bp_name, url_prefix in blueprints:
+        try:
+            module = __import__(module_name, fromlist=['bp'])
+            app.register_blueprint(module.bp, url_prefix=url_prefix)
+        except ImportError as e:
+            app.logger.warning(f"No se pudo cargar {module_name}: {e}")
+
+def register_error_handlers(app):
+    """Registra manejadores de errores personalizados."""
+    
     @app.errorhandler(404)
     def not_found_error(error):
-        from flask import render_template
         return render_template('errors/404.html'), 404
     
     @app.errorhandler(500)
     def internal_error(error):
-        from flask import render_template
-        import logging
-        logging.error(f"Error interno del servidor: {error}")
+        app.logger.error(f"Error interno: {error}")
         return render_template('errors/500.html'), 500
     
     @app.errorhandler(Exception)
     def handle_exception(e):
-        from werkzeug.exceptions import HTTPException
         if isinstance(e, HTTPException):
             return e
-        import logging
-        from flask import render_template
-        logging.error(f"Error no controlado: {e}", exc_info=True)
+        app.logger.error(f"Error no controlado: {e}", exc_info=True)
         return render_template('errors/500.html'), 500
+
+def configure_logging(app):
+    """Configura el sistema de logging."""
+    if not os.path.exists('logs'):
+        os.mkdir('logs')
     
-    # Contexto de template global
-    @app.context_processor
-    def inject_debug():
-        return dict(debug=app.debug)
-    
-    # Ruta de salud
-    @app.route('/health')
-    def health_check():
-        return {'status': 'healthy', 'version': '2.0.0'}, 200
-    
-    import logging
-    logging.info(f"Aplicación Flask creada exitosamente - config: {config_name}, debug: {app.debug}")
-    
-    return app
+    file_handler = RotatingFileHandler(
+        'logs/erc_insight.log',
+        maxBytes=10240000,
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('ERC Insight startup')
 

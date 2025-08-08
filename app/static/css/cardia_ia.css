@@ -557,40 +557,31 @@ select:invalid:focus {
 .high-contrast .checkbox-card {
     border-width: 2px;
 }
-. i n p u t - g r o u p   { 
- 
-         p o s i t i o n :   r e l a t i v e ; 
- 
- } 
- 
- 
- 
- . c l e a r - v a l u e - b t n   { 
- 
-         p o s i t i o n :   a b s o l u t e ; 
- 
-         r i g h t :   0 ; 
- 
-         t o p :   0 ; 
- 
-         z - i n d e x :   5 ; 
- 
-         f o n t - s i z e :   0 . 7 r e m ; 
- 
-         p a d d i n g :   0 . 1 5 r e m   0 . 3 r e m ; 
- 
-         m a r g i n :   3 p x ; 
- 
-         b o r d e r - r a d i u s :   4 p x ; 
- 
- } 
- 
- 
- 
- . c u s t o m - s e l e c t   { 
- 
-         p a d d i n g - r i g h t :   3 0 p x   ! i m p o r t a n t ; 
- 
- } 
- 
- .input-group { position: relative; } .clear-value-btn { position: absolute; right: 0; top: 0; z-index: 5; font-size: 0.7rem; padding: 0.15rem 0.3rem; margin: 3px; border-radius: 4px; } .custom-select { padding-right: 30px !important; }
+
+.input-group {
+    position: relative;
+}
+
+.clear-value-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 5;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.3rem;
+    margin: 3px;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clear-value-btn:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.custom-select {
+    padding-right: 30px !important;
+}

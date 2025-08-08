@@ -22,12 +22,33 @@ def extract_data_from_txt(txt_path):
         # Extraer datos relevantes
         extracted_data = {
             'texto_completo': text_content,
-            'fecha': extract_date(text_content)
+            'fecha': extract_date(text_content),
+            'source': 'TXT'
         }
         
         return extracted_data
         
+    except UnicodeDecodeError:
+        # Intentar con diferentes codificaciones
+        for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+            try:
+                with open(txt_path, 'r', encoding=encoding) as file:
+                    text_content = file.read()
+                return {
+                    'texto_completo': text_content,
+                    'fecha': extract_date(text_content),
+                    'source': 'TXT',
+                    'encoding': encoding
+                }
+            except UnicodeDecodeError:
+                continue
+        
+        logging.error(f"No se pudo decodificar el archivo TXT: {txt_path}")
+        return {'error': 'No se pudo decodificar el archivo'}
+        
     except Exception as e:
+        logging.error(f"Error extrayendo datos del TXT {txt_path}: {e}")
+        return {"error": f"Error procesando TXT: {str(e)}"}
         logging.error(f"Error al extraer datos del TXT {txt_path}: {str(e)}")
         return {'error': str(e)}
 

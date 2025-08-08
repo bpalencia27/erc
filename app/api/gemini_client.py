@@ -8,18 +8,15 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 from app.utils.caching import cached_result
-from google.generativeai import GenerativeModel
+from app.api.llm_adapters import get_llm_adapter
 from flask import current_app
 
 # Cargar variables de entorno
 load_dotenv()
 
 def get_gemini_client():
-    api_key = os.environ.get('GEMINI_API_KEY')
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY no está configurada en las variables de entorno")
-    
-    return GenerativeModel(model_name="gemini-pro", api_key=api_key)
+    """Conservado para compatibilidad; devuelve un adaptador LLM según entorno."""
+    return get_llm_adapter()
 
 class GeminiClient:
     """Cliente para interactuar con la API de Google Gemini."""
@@ -31,9 +28,12 @@ class GeminiClient:
         
         if self.use_simulation:
             logging.warning("API key de Google Gemini no configurada, usando modo simulado")
-        else:
-            # Configurar la API de Gemini con la clave
+        # Siempre intentar obtener adaptador si hay cualquier proveedor configurado
+        try:
             self.model = get_gemini_client()
+            self.use_simulation = False
+        except Exception as e:
+            logging.warning(f"LLM no disponible, permaneciendo en modo simulado: {e}")
     
     def extract_lab_results(self, text):
         """Extrae resultados de laboratorio desde un texto utilizando IA."""

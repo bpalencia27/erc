@@ -1,11 +1,9 @@
-<<<<<<< HEAD
-# Python
+## Python estándar
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -20,87 +18,73 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
+.coverage
 
-# Entorno virtual
+## Entornos virtuales
 venv/
+.venv/
+.venv*/
 ENV/
 env/
+**/venv/
+**/Lib/
+**/Scripts/
+**/Include/
+**/site-packages/
 
-# Archivos de variables de entorno
+## Variables de entorno
 .env
 .env.local
 .env.development
 .env.test
 .env.production
 
-# Logs
+## Logs y base de datos
 logs/
 *.log
-
-# Archivos de base de datos
 *.db
 *.sqlite3
+instance/
 
-# Archivos de aplicación
+## Archivos de aplicación
 app/static/uploads/*
 app/static/reports/*
 !app/static/uploads/.gitkeep
 !app/static/reports/.gitkeep
+uploads/*
+temp/
 
-# VS Code
+## IDE/Editor
 .vscode/
 *.code-workspace
 .history/
-
-# PyCharm
 .idea/
 
-# Archivos temporales
+## Temporales del sistema
 .DS_Store
 Thumbs.db
 .~*
 *.swp
 *.swo
-=======
-# ERC Insight - Deployment Cleanup
-venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.env
-*.log
-logs/
-instance/
-*.egg-info/
-.pytest_cache/
-.coverage
-uploads/*
-temp/
-*.zip
-RCV IA/
-**/venv/
-**/site-packages/
-**/Lib/
-**/Scripts/
-**/Include/
-**/*.backup
-**/*.bak
-**/temp
 *.tmp
 **/*~
-**/.DS_Store
-**/*.swp
-# Archivos duplicados
+
+## Archivos duplicados y backups
 **/*_backup.*
 **/* (1).*
-# Archivos de configuración específicos
+**/*.backup
+**/*.bak
+
+## Archivos específicos/ruidosos
 wsgi.py - Configuración WSGI optimizad*
-# Archivos temporales de zip
+
+## Paquetes/zip y artefactos
 *.zip
 ercp.zip
 erc.zip
-# Archivos de ejemplo
+
+## Archivos de ejemplo y scripts de prueba locales
 ejemplo_*
 test_output.py
 hello*.py
@@ -108,6 +92,10 @@ minimal_flask.py
 simple_flask.py
 run_*.py
 migrations.py
-# Archivos README duplicados
+
+## No ignorar el subproyecto adicional
+# (Aseguramos que 'RCV IA/' sí se rastree)
+# RCV IA/
+
+## Duplicados de README
 README_new.md
->>>>>>> 1a009ef5 ( Preparación completa para despliegue en Render.com)

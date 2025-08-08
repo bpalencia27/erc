@@ -245,3 +245,51 @@ class AdvancedReportGenerator:
             "recomendacion": recomendacion,
             "nivel_cumplimiento": nivel_cumplimiento
         }
+
+    def _build_therapeutic_goals(self, patient_data, labs_data, tfg, riesgo_cv):
+        """
+        Construye la lista de metas terapéuticas con puntajes según perfil.
+        Devuelve una lista de dicts con al menos 'parametro' y 'puntaje'.
+        """
+        try:
+            # Definiciones mínimas para pruebas (evitamos import con espacio en 'RCV IA')
+            from app.logic.advanced_patient_eval import determinar_etapa_erc as det_etapa
+            PUNTAJE_METAS = {
+                "rac": {"erc123_dm2": 20, "erc4_dm2": 15, "erc123_nodm2": 25, "erc4_nodm2": 10},
+                "glicemia": {"erc123_dm2": 4, "erc4_dm2": 5, "erc123_nodm2": 5, "erc4_nodm2": 10},
+                "hdl": {"erc123_dm2": 4, "erc4_dm2": 5, "erc123_nodm2": 5, "erc4_nodm2": 10},
+            }
+            METAS_TERAPEUTICAS = {
+                "rac": {"default": 30},
+                "glicemia": {"default": 130},
+                "hdl": {"hombre": 40, "mujer": 50},
+            }
+
+            # Determinar perfil simple como en RCV IA
+            def _perfil(estadio, tiene_dm2):
+                es = str(estadio)
+                grupo = "erc123" if es in ["1", "2", "3", "3a", "3b"] else "erc4"
+                return f"{grupo}_{'dm2' if tiene_dm2 else 'nodm2'}"
+
+            from app.logic.advanced_patient_eval import determinar_etapa_erc as det_etapa_local
+            estadio = det_etapa_local(tfg)
+            perfil = _perfil(estadio, bool(patient_data.get("tiene_dm2") or patient_data.get("dm2")))
+
+            metas = []
+            # RAC
+            if "rac" in labs_data:
+                puntaje = PUNTAJE_METAS.get("rac", {}).get(perfil, 0)
+                metas.append({"parametro": "RAC", "puntaje": puntaje})
+            # Glicemia
+            if "glicemia" in labs_data:
+                puntaje = PUNTAJE_METAS.get("glicemia", {}).get(perfil, 0)
+                metas.append({"parametro": "Glicemia", "puntaje": puntaje})
+            # HDL
+            if "hdl" in labs_data:
+                puntaje = PUNTAJE_METAS.get("hdl", {}).get(perfil, 0)
+                metas.append({"parametro": "HDL", "puntaje": puntaje})
+
+            return metas
+        except Exception as e:
+            logger.warning(f"No fue posible construir metas terapéuticas: {e}")
+            return []

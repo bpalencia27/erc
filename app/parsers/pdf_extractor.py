@@ -4,7 +4,6 @@ Módulo para la extracción de documentos PDF
 import re
 import logging
 import os
-import PyPDF2
 
 def extract_data_from_pdf(pdf_path):
     """
@@ -21,31 +20,74 @@ def extract_data_from_pdf(pdf_path):
             logging.error(f"Archivo PDF no encontrado: {pdf_path}")
             return {'error': 'Archivo no encontrado'}
         
-        # Extraer texto usando PyPDF2
-        with open(pdf_path, 'rb') as file:
-            reader = PyPDF2.PdfReader(file)
-            
-            # Extraer texto de todas las páginas
-            texto_completo = ""
-            for page_num in range(len(reader.pages)):
-                page = reader.pages[page_num]
-                texto_completo += page.extract_text() + "\n"
-            
-            # Intentar extraer fecha del documento
-            fecha_match = re.search(r'Fecha[:\s]+(\d{2}[-/]\d{2}[-/]\d{4})', texto_completo)
-            fecha = fecha_match.group(1) if fecha_match else None
-            
-            # Crear diccionario con datos extraídos
-            extracted_data = {
-                'texto_completo': texto_completo,
-                'fecha': fecha
-            }
-            
-            return extracted_data
+        # Intentar usar PyPDF2 primero
+        try:
+            import PyPDF2
+            return extract_with_pypdf2(pdf_path)
+        except ImportError:
+            pass
+        
+        # Intentar usar pdfplumber como alternativa
+        try:
+            import pdfplumber
+            return extract_with_pdfplumber(pdf_path)
+        except ImportError:
+            pass
+        
+        # Si no hay librerías disponibles, retornar error
+        logging.error("No hay librerías de PDF disponibles (PyPDF2 o pdfplumber)")
+        return {"error": "No se pueden procesar archivos PDF. Instale PyPDF2 o pdfplumber."}
         
     except Exception as e:
-        logging.error(f"Error al extraer datos del PDF {pdf_path}: {str(e)}")
-        return {'error': str(e)}
+        logging.error(f"Error extrayendo datos del PDF {pdf_path}: {e}")
+        return {"error": f"Error procesando PDF: {str(e)}"}
+
+def extract_with_pypdf2(pdf_path):
+    """Extrae texto usando PyPDF2"""
+    import PyPDF2
+    
+    with open(pdf_path, 'rb') as file:
+        reader = PyPDF2.PdfReader(file)
+        
+        # Extraer texto de todas las páginas
+        texto_completo = ""
+        for page_num in range(len(reader.pages)):
+            page = reader.pages[page_num]
+            texto_completo += page.extract_text() + "\n"
+        
+        # Intentar extraer fecha del documento
+        fecha_match = re.search(r'Fecha[:\s]+(\d{2}[-/]\d{2}[-/]\d{4})', texto_completo)
+        fecha = fecha_match.group(1) if fecha_match else None
+        
+        # Crear diccionario con datos extraídos
+        extracted_data = {
+            'texto_completo': texto_completo,
+            'fecha': fecha,
+            'source': 'PyPDF2'
+        }
+        
+        return extracted_data
+
+def extract_with_pdfplumber(pdf_path):
+    """Extrae texto usando pdfplumber"""
+    import pdfplumber
+    
+    texto_completo = ""
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                texto_completo += text + "\n"
+    
+    # Intentar extraer fecha del documento
+    fecha_match = re.search(r'Fecha[:\s]+(\d{2}[-/]\d{2}[-/]\d{4})', texto_completo)
+    fecha = fecha_match.group(1) if fecha_match else None
+    
+    return {
+        'texto_completo': texto_completo,
+        'fecha': fecha,
+        'source': 'pdfplumber'
+    }
         
 def extract_lab_values(text):
     """
