@@ -2,14 +2,31 @@ from flask import (
     render_template, flash, redirect, url_for, request, 
     jsonify, session, current_app
 )
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField
+from wtforms.validators import DataRequired, Length, Regexp
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.auth import bp
 from app.models import User
-from app.extensions import db
+from app.extensions import db, csrf
 from functools import wraps
 import jwt
 from datetime import datetime, timedelta
+import re
+
+class LoginForm(FlaskForm):
+    username = StringField('Usuario', validators=[
+        DataRequired(),
+        Length(min=3, max=20),
+        Regexp(r'^[a-zA-Z0-9_-]+$', message='El usuario solo puede contener letras, números, guiones y guiones bajos')
+    ])
+    password = PasswordField('Contraseña', validators=[
+        DataRequired(),
+        Length(min=8),
+        Regexp(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$', 
+            message='La contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra y un número')
+    ])
 
 def login_required(f):
     @wraps(f)
@@ -58,9 +75,11 @@ def login_required(f):
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+    form = LoginForm()
+    
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
         
         # Verificar credenciales
         user = User.query.filter_by(username=username).first()
@@ -69,20 +88,26 @@ def login():
             flash('Usuario o contraseña incorrectos', 'error')
             return redirect(url_for('auth.login'))
             
-        # Generar token JWT
+        # Limpiar sesiones anteriores
+        session.clear()
+            
+        # Generar token JWT con más claims de seguridad
         token = jwt.encode({
             'sub': user.id,
             'name': user.name,
             'iat': datetime.utcnow(),
-            'exp': datetime.utcnow() + timedelta(hours=24)
-        }, current_app.config['SECRET_KEY'])
+            'exp': datetime.utcnow() + timedelta(hours=24),
+            'jti': os.urandom(16).hex(),  # JWT ID único
+            'ip': request.remote_addr
+        }, current_app.config['SECRET_KEY'], algorithm='HS256')
         
-        # Guardar token en session
+        # Guardar token en session con httponly
         session['token'] = token
+        session.permanent = True  # Usar duración configurada de la sesión
         
         return redirect(url_for('main.index'))
         
-    return render_template('auth/login.html')
+    return render_template('auth/login.html', form=form)
 
 @bp.route('/logout')
 def logout():

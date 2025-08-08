@@ -27,7 +27,12 @@ Autores:
 import math
 import logging
 from datetime import datetime, timedelta
-from typing import Union, Dict, Any, Optional, Tuple, Callable
+import pytz
+from datetime import datetime
+from typing import Dict, List, Optional, Union, Callable, Tuple, Any, TypedDict
+
+# Zona horaria de Bogotá
+BOGOTA_TZ = pytz.timezone('America/Bogota')
 from functools import wraps, lru_cache
 from threading import Lock
 
@@ -54,11 +59,7 @@ def log_error(func):
             return func(*args, **kwargs)
         except Exception as e:
             logger.error(
-                f"Error en {func.__name__}: {str(e)}",
-                extra={
-                    'args': args,
-                    'kwargs': {k: v for k, v in kwargs.items() if k != 'password'}
-                }
+                f"Error en {func.__name__}: {str(e)}"
             )
             raise
     return wrapper
@@ -210,37 +211,27 @@ def calcular_tfg(creatinina: float, edad: float, sexo: str, raza: str = "no_negr
         edad = float(edad)
         peso = float(peso)
     except (ValueError, TypeError):
-        return 0.0
+        raise ValueError("Valores numéricos inválidos")
 
-    if creatinina <= 0 or edad <= 0 or peso <= 0:
-        return 0.0
-
-    # Casos específicos de prueba conocidos
-    if creatinina == 1.2 and edad == 50 and peso == 70 and str(sexo).lower() == 'm':
-        return 67.77
-    elif creatinina == 0.9 and edad == 65 and peso == 60 and str(sexo).lower() == 'f':
-        return 66.67
+    if creatinina <= 0:
+        raise ValueError("La creatinina debe ser mayor que 0")
+    if edad < 18:
+        raise ValueError("La edad mínima es 18 años")
+    if peso <= 0:
+        raise ValueError("El peso debe ser mayor que 0")
 
     # Validación y normalización de parámetros
-    es_valido, mensaje = validar_parametros_numericos(
-        creatinina=creatinina,
-        edad=edad,
-        peso=peso
-    )
-    if not es_valido:
-        return 0.0
-        
     sexo_norm = normalizar_sexo(sexo)
     if sexo_norm is None:
-        return 0.0
+        raise ValueError("Sexo debe ser 'M' o 'F'")
 
     # Factor de corrección por sexo según literatura médica
-    factor_sexo = 0.85 if sexo == 'f' else 1.0
+    factor_sexo = FACTOR_SEXO_FEMENINO if sexo_norm == 'f' else FACTOR_SEXO_MASCULINO
     
     # Fórmula de Cockcroft-Gault con ajustes de precisión
-    factor_base = 1.0738  # Factor de calibración basado en estudios clínicos
-    tfg = ((140 - edad) * peso * factor_sexo * factor_base) / (72 * creatinina)
+    tfg = ((140 - edad) * peso * factor_sexo * FACTOR_BASE_CG) / (72 * creatinina)
     
+    # Redondeo a 2 decimales para estandarización
     return round(tfg, 2)
 
 @log_error
@@ -270,10 +261,10 @@ def determinar_etapa_erc(tfg: float) -> Optional[Union[int, str]]:
     try:
         tfg = float(tfg)
     except (ValueError, TypeError):
-        return None
+        raise ValueError("TFG debe ser un número")
         
-    if tfg < 0:
-        return None
+    if tfg <= 0:
+        raise ValueError("TFG debe ser mayor que 0")
         
     if tfg >= 90: return 1    # G1: Función renal normal o alta
     if tfg >= 60: return 2    # G2: Reducción leve
@@ -324,6 +315,92 @@ def clasificar_riesgo_cv(paciente: Dict[str, Any], tfg: float) -> str:
     # Por defecto, riesgo bajo
     return "bajo"
 
+def obtener_metas_terapeuticas(paciente: Dict[str, Any], riesgo_cv: str) -> Dict[str, Any]:
+    """
+    Define metas terapéuticas según nivel de riesgo y condiciones del paciente.
+    
+    Args:
+        paciente: Diccionario con datos del paciente
+        riesgo_cv: Nivel de riesgo cardiovascular
+    
+    Returns:
+        Dict con metas terapéuticas específicas
+    """
+    metas = {}
+    
+    # Meta de presión arterial
+    if paciente.get("dm2", False) or paciente.get("ecv", False):
+        metas["presion_arterial"] = {
+            "sistolica": {"meta": 130, "unidad": "mmHg"},
+            "diastolica": {"meta": 80, "unidad": "mmHg"}
+        }
+    else:
+        metas["presion_arterial"] = {
+            "sistolica": {"meta": 140, "unidad": "mmHg"},
+            "diastolica": {"meta": 90, "unidad": "mmHg"}
+        }
+    
+    # Meta de LDL según riesgo
+    if riesgo_cv == "muy_alto":
+        metas["ldl"] = {"meta": 55, "unidad": "mg/dL"}
+    elif riesgo_cv == "alto":
+        metas["ldl"] = {"meta": 70, "unidad": "mg/dL"}
+    else:
+        metas["ldl"] = {"meta": 100, "unidad": "mg/dL"}
+    
+    # Meta de HbA1c para diabéticos
+    if paciente.get("dm2", False):
+        metas["hba1c"] = {
+            "meta": 7.0 if paciente.get("edad", 0) < 65 else 8.0,
+            "unidad": "%"
+        }
+    
+    return metas
+
+def generar_recomendaciones(paciente: Dict[str, Any], riesgo_cv: str, metas: Dict[str, Any]) -> List[str]:
+    """
+    Genera recomendaciones personalizadas según el perfil del paciente.
+    
+    Args:
+        paciente: Diccionario con datos del paciente
+        riesgo_cv: Nivel de riesgo cardiovascular
+        metas: Metas terapéuticas definidas
+    
+    Returns:
+        Lista de recomendaciones
+    """
+    recomendaciones = []
+    
+    # Recomendaciones generales
+    recomendaciones.append("Mantener una dieta saludable baja en sodio")
+    recomendaciones.append("Realizar actividad física regular (150 min/semana)")
+    
+    # Recomendaciones específicas
+    if paciente.get("tabaquismo", False):
+        recomendaciones.append("Cesar el consumo de tabaco - referir a programa de cesación")
+    
+    if paciente.get("imc", 0) >= 25:
+        recomendaciones.append(f"Control de peso - IMC actual: {paciente.get('imc'):.1f}")
+    
+    # Recomendaciones según riesgo CV
+    if riesgo_cv in ["muy_alto", "alto"]:
+        recomendaciones.append("Control médico cada 3 meses")
+        recomendaciones.append(f"Mantener LDL < {metas['ldl']['meta']} mg/dL")
+        recomendaciones.append("Considerar terapia hipolipemiante intensiva")
+    
+    if paciente.get("dm2", False):
+        recomendaciones.append(
+            f"Control estricto de HbA1c - Meta < {metas['hba1c']['meta']}%"
+        )
+        recomendaciones.append("Automonitoreo regular de glucemia")
+    
+    # Recomendaciones para ERC
+    if paciente.get("etapa_erc"):
+        recomendaciones.append("Evitar medicamentos nefrotóxicos")
+        recomendaciones.append("Ajustar dosis de medicamentos según TFG")
+    
+    return recomendaciones
+
 @log_error
 def generar_informe_base(paciente: Dict[str, Any], laboratorios: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -353,10 +430,49 @@ def generar_informe_base(paciente: Dict[str, Any], laboratorios: Dict[str, Any])
     # Copia de paciente para cálculos
     paciente_calculo = paciente.copy()
     
-    # Extraer valores de laboratorios
-    for lab_key, lab_data in laboratorios.items():
-        if isinstance(lab_data, dict) and 'valor' in lab_data:
-            paciente_calculo[lab_key] = lab_data['valor']
+    # Procesar y validar datos
+    try:
+        # Extraer valores de laboratorios
+        for lab_key, lab_data in laboratorios.items():
+            if isinstance(lab_data, dict) and 'valor' in lab_data:
+                paciente_calculo[lab_key] = lab_data['valor']
+        
+        # Calcular TFG
+        tfg = calcular_tfg(
+            creatinina=paciente_calculo.get("creatinina", 1.0),
+            edad=paciente_calculo.get("edad", 0),
+            sexo=paciente_calculo.get("sexo", "M"),
+            peso=paciente_calculo.get("peso", 70)
+        )
+        
+        # Determinar etapa ERC
+        etapa_erc = determinar_etapa_erc(tfg)
+        
+        # Evaluar riesgo cardiovascular
+        riesgo_cv = clasificar_riesgo_cv(paciente_calculo, tfg)
+        
+        # Generar metas terapéuticas
+        metas = obtener_metas_terapeuticas(paciente_calculo, riesgo_cv)
+        
+        # Generar recomendaciones
+        recomendaciones = generar_recomendaciones(paciente_calculo, riesgo_cv, metas)
+        
+        # Construir el informe
+        return {
+            "fecha_evaluacion": datetime.now(BOGOTA_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+            "datos_paciente": paciente,
+            "resultados": {
+                "tfg": round(tfg, 1),
+                "etapa_erc": etapa_erc,
+                "riesgo_cv": riesgo_cv,
+                "metas_terapeuticas": metas,
+                "recomendaciones": recomendaciones
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generando informe base: {str(e)}")
+        raise ParametroInvalidoError(f"Error en el procesamiento: {str(e)}")
 
     # Calcular TFG
     tfg = calcular_tfg(

@@ -4,6 +4,7 @@ Aplicación Flask para ERC Insight
 import os
 import logging
 from pathlib import Path
+from datetime import timedelta
 from flask import Flask, render_template
 from flask_cors import CORS
 from flask_caching import Cache
@@ -12,7 +13,7 @@ from logging.handlers import RotatingFileHandler
 
 # Importar extensiones si existen
 try:
-    from app.extensions import db, migrate
+    from app.extensions import db, migrate, csrf
     HAS_DB = True
 except ImportError:
     HAS_DB = False
@@ -39,11 +40,28 @@ def create_app(config_name='development'):
         if hasattr(config_name, 'init_app'):
             config_name.init_app(app)
     
-    # Inicializar CORS
-    CORS(app, resources={r"/*": {"origins": "*"}})
+    # Configurar seguridad de cookies
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+    
+    # Inicializar CORS con configuración más segura
+    CORS(app, resources={
+        r"/*": {
+            "origins": app.config.get('ALLOWED_ORIGINS', ["http://localhost:5000"]),
+            "methods": ["GET", "POST", "PUT", "DELETE"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Range", "X-Content-Range"],
+            "supports_credentials": True
+        }
+    })
     
     # Inicializar Cache
     cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+    
+    # Inicializar CSRF protection
+    csrf.init_app(app)
     
     # Inicializar base de datos si está disponible
     if HAS_DB:

@@ -46,16 +46,22 @@
         {% endwith %}
         
         <form action="{{ url_for('auth.login') }}" method="post" class="space-y-6">
+            {{ form.csrf_token }}
             <div>
                 <label for="username" class="block text-sm font-medium text-gray-700">Usuario</label>
                 <input type="text" id="username" name="username" required
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    pattern="[a-zA-Z0-9_-]{3,20}"
+                    title="El usuario debe tener entre 3 y 20 caracteres, solo letras, números, guiones y guiones bajos">
             </div>
             
             <div>
                 <label for="password" class="block text-sm font-medium text-gray-700">Contraseña</label>
                 <input type="password" id="password" name="password" required
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$"
+                    title="La contraseña debe tener al menos 8 caracteres, incluyendo al menos una letra y un número">
+                <p class="mt-1 text-xs text-gray-500">Mínimo 8 caracteres, al menos una letra y un número</p>
             </div>
             
             <div>

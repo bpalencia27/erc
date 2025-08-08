@@ -4,6 +4,7 @@ from app.api.report_generator import AdvancedReportGenerator  # Ajusta esta ruta
 from app.utils.security import DataValidator
 from app.parsers.lab_parser import parse_lab_results
 from app.api.gemini_client import GeminiClient
+from app.logic.patient_eval import PatientEvaluation
 import os
 import json
 import traceback
@@ -48,6 +49,31 @@ def generate_report():
     """Endpoint para generar informe clínico con IA."""
     try:
         data = request.json
+        if not data:
+            return jsonify({"success": False, "error": "No se proporcionaron datos"}), 400
+            
+        # Validar datos requeridos
+        required_fields = ['patient_data', 'lab_results']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"success": False, "error": f"Falta el campo {field}"}), 400
+        
+        # Generar informe usando IA
+        report_generator = AdvancedReportGenerator()
+        report = report_generator.generate_report(
+            patient_data=data['patient_data'],
+            lab_results=data['lab_results']
+        )
+        
+        return jsonify({
+            "success": True,
+            "report": report
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error al generar informe: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({"success": False, "error": str(e)}), 500
         if not data or not data.get('patient'):
             return jsonify({"success": False, "error": "No se proporcionaron datos del paciente"}), 400
             
@@ -129,7 +155,80 @@ def process_patient():
         current_app.logger.error(f"Error al procesar paciente: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-# Define aquí tus rutas de API
+@bp.route('/evaluate_patient', methods=['POST'])
+def evaluate_patient():
+    """
+    Endpoint para evaluación clínica del paciente
+    
+    Espera JSON con:
+    {
+        "patient_data": {
+            "edad": int,
+            "peso": float,
+            "talla": float,
+            "sexo": str,
+            "creatinina": float,
+            "pa_sistolica": int,
+            "pa_diastolica": int,
+            "diabetes": bool,
+            "hipertension": bool,
+            "ecv": bool,
+            "tabaquismo": bool
+        },
+        "lab_results": {
+            "lab_name": {
+                "valor": float,
+                "unidad": str,
+                "fecha": str,
+                "dias_desde_toma": int
+            },
+            ...
+        }
+    }
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"success": False, "error": "No se proporcionaron datos"}), 400
+            
+        # Validar datos requeridos
+        required_fields = ["patient_data", "lab_results"]
+        if not all(field in data for field in required_fields):
+            return jsonify({
+                "success": False, 
+                "error": "Faltan campos requeridos",
+                "required": required_fields
+            }), 400
+        
+        # Inicializar evaluador
+        evaluator = PatientEvaluation()
+        
+        # Realizar evaluación
+        evaluation = evaluator.evaluate_patient(
+            data["patient_data"],
+            data["lab_results"]
+        )
+        
+        return jsonify({
+            "success": True,
+            "evaluation": evaluation
+        })
+        
+    except ValueError as ve:
+        return jsonify({
+            "success": False,
+            "error": "Error de validación",
+            "details": str(ve)
+        }), 400
+        
+    except Exception as e:
+        current_app.logger.error(f"Error en evaluación: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({
+            "success": False,
+            "error": "Error interno del servidor",
+            "details": str(e)
+        }), 500
+
 @bp.route('/test')
 def test():
     return {"message": "API funcionando correctamente"}
