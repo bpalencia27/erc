@@ -12,6 +12,19 @@ class ModalManager {
         this.lastZIndex = 1050;
         this.focusStack = [];
         this.animations = new Map();
+        
+        // Exponer método de cierre globalmente
+        window.closeModal = (modalId) => {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+                console.log('[DEBUG] Modal cerrado (ModalManager):', modalId);
+            }
+        };
+        
         this.init();
     }
     
@@ -31,23 +44,59 @@ class ModalManager {
     }
     
     setupGlobalListeners() {
+        // Evitar múltiples bindings
+        if (this._globalListenersSet) return;
+        this._globalListenersSet = true;
+
+        // Captura para bloquear clicks al fondo cuando hay modales abiertos
+        document.addEventListener('click', (e) => {
+            if (this.modalStack.length === 0) return;
+            const topModalId = this.modalStack[this.modalStack.length - 1];
+            const topModalEl = document.getElementById(topModalId);
+            if (!topModalEl) return;
+            if (!e.target.closest('.modal') && !e.target.classList.contains('modal-backdrop')) {
+                // Click fuera de cualquier modal mientras uno está abierto => bloquear
+                e.stopPropagation();
+                e.preventDefault();
+                console.log('[DEBUG] Click bloqueado fuera de modal activo');
+            }
+        }, true);
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.modalStack.length > 0) {
                 e.preventDefault();
                 const lastModal = this.modalStack[this.modalStack.length - 1];
                 this.closeModal(lastModal);
+                console.log('[DEBUG] Escape presionado, cerrando modal:', lastModal);
             }
         });
         
         document.addEventListener('click', (e) => {
+            if (e.target) {
+                console.log('[DEBUG] Click global:', e.target, 'clases:', e.target.className, 'id:', e.target.id);
+            }
+            // Backdrop
             if (e.target.classList.contains('modal-backdrop')) {
-                const modal = document.querySelector('.modal.show');
+                e.preventDefault();
+                e.stopPropagation();
+                const lastModal = this.modalStack[this.modalStack.length - 1];
+                if (lastModal) this.closeModal(lastModal);
+                return;
+            }
+            // Botón de cierre (usar closest para íconos internos)
+            const closeBtn = e.target.closest('[data-dismiss="modal"], [data-bs-dismiss="modal"], .close-modal, .modal-close, [aria-label="Close"], .btn-close');
+            if (closeBtn) {
+                const modal = closeBtn.closest('.modal');
                 if (modal) {
+                    e.preventDefault();
                     this.closeModal(modal.id || modal);
                 }
-            } else if (e.target.classList.contains('modal') && !e.target.closest('.modal-dialog')) {
-                // Solo cerrar si el clic fue directamente en el modal (fuera del dialog)
-                this.closeModal(e.target.id || e.target);
+                return;
+            }
+            // Click fuera del contenido del modal (sobre overlay interno del modal) => cerrar
+            const modalEl = e.target.classList.contains('modal') ? e.target : e.target.closest('.modal');
+            if (modalEl && !e.target.closest('.modal-dialog')) {
+                this.closeModal(modalEl.id || modalEl);
             }
         });
     }
@@ -398,6 +447,14 @@ modalStyles.textContent = `
     @supports (-webkit-overflow-scrolling: touch) {
         .modal-open { position: fixed; width: 100%; }
     }
+    
+    /* Asegurar estilos robustos de modales y backdrop */
+    .modal { position: fixed; top:0; left:0; width:100%; height:100%; overflow:auto; z-index:1050; display:none; background:rgba(0,0,0,0.05); }
+    .modal.show { display:block; }
+    .modal-dialog { position:relative; margin:1.5rem auto; pointer-events:auto; z-index:1060; }
+    .modal-backdrop { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1040; pointer-events:auto; }
+    body.modal-open { overflow:hidden; }
+    body.modal-open > *:not(.modal):not(.modal-backdrop) { /* impedir interacción fondo */ }
 `;
 document.head.appendChild(modalStyles);
 
