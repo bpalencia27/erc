@@ -97,8 +97,8 @@ run_*.py
 migrations.py
 
 ## No ignorar el subproyecto adicional
-# (Aseguramos que 'RCV IA/' sí se rastree)
-# RCV IA/
+# Ignorar carpeta RCV IA (repositorio antiguo desacoplado)
+RCV IA/
 
 ## Duplicados de README
 README_new.md

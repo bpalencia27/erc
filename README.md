@@ -95,3 +95,32 @@ Consulta el archivo `ENV_INSTRUCTIONS.md` para detalles sobre las variables de e
 ## Licencia
 
 Este proyecto está licenciado bajo los términos de la licencia MIT.
+
+## Mantenimiento y Utilidades
+
+### Limpieza de Duplicados
+
+Se añadió el script `scripts/check_duplicates.py` para detectar archivos Python duplicados (sufijos ` (1).py`, `.bak`, `_backup.py`, `__copy.py`).
+
+Uso:
+```
+python -m scripts.check_duplicates           # Solo listar
+python -m scripts.check_duplicates --fix     # Eliminar duplicados idénticos
+```
+
+Incorpóralo en CI para evitar que se vuelvan a introducir copias conflictivas.
+
+### Carpeta `RCV IA/`
+
+Se desacopló del repositorio principal (ya no se versiona) porque contenía un repositorio Git embebido que generaba conflictos. Si se requiere reintroducirlo, usar un submódulo formal:
+```
+git submodule add <url-del-repo-rcv> "RCV IA"
+```
+
+### Cliente LLM Unificado
+
+`app/api/gemini_client.py` ahora utiliza adaptadores (`llm_adapters.py`) compatibles con Gemini u OpenAI. Si no hay claves (`GEMINI_API_KEY` u `OPENAI_API_KEY`), opera en modo simulado para tests.
+
+### Tests Nuevos
+
+Se añadió `tests/test_gemini_client.py` para validar el comportamiento en modo simulado.
