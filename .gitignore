@@ -79,6 +79,9 @@ Thumbs.db
 ## Archivos específicos/ruidosos
 wsgi.py - Configuración WSGI optimizad*
 
+# Permitimos versionar scripts utilitarios
+!scripts/
+
 ## Paquetes/zip y artefactos
 *.zip
 ercp.zip
